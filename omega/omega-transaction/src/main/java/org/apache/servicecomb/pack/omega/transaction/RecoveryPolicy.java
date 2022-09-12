@@ -22,6 +22,6 @@ import org.apache.servicecomb.pack.omega.transaction.annotations.Compensable;
 import org.aspectj.lang.ProceedingJoinPoint;
 
 public interface RecoveryPolicy {
-  Object apply(ProceedingJoinPoint joinPoint, Compensable compensable, CompensableInterceptor interceptor,
-      OmegaContext context, String parentTxId, int forwardRetries) throws Throwable;
+    Object apply(ProceedingJoinPoint joinPoint, Compensable compensable, CompensableInterceptor interceptor,
+                 OmegaContext context, String parentTxId, int forwardRetries) throws Throwable;
 }

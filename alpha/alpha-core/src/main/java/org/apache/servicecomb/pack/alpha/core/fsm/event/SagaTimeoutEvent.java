@@ -18,43 +18,45 @@
 package org.apache.servicecomb.pack.alpha.core.fsm.event;
 
 import java.util.Date;
+
 import org.apache.servicecomb.pack.alpha.core.fsm.event.base.SagaEvent;
 
 public class SagaTimeoutEvent extends SagaEvent {
 
-  public static Builder builder() {
-    return new Builder();
-  }
-  public static final class Builder {
-
-    private SagaTimeoutEvent sagaTimeoutEvent;
-
-    private Builder() {
-      sagaTimeoutEvent = new SagaTimeoutEvent();
+    public static Builder builder() {
+        return new Builder();
     }
 
-    public Builder serviceName(String serviceName) {
-      sagaTimeoutEvent.setServiceName(serviceName);
-      return this;
-    }
+    public static final class Builder {
 
-    public Builder instanceId(String instanceId) {
-      sagaTimeoutEvent.setInstanceId(instanceId);
-      return this;
-    }
+        private SagaTimeoutEvent sagaTimeoutEvent;
 
-    public Builder globalTxId(String globalTxId) {
-      sagaTimeoutEvent.setGlobalTxId(globalTxId);
-      return this;
-    }
+        private Builder() {
+            sagaTimeoutEvent = new SagaTimeoutEvent();
+        }
 
-    public Builder createTime(Date createTime){
-      sagaTimeoutEvent.setCreateTime(createTime);
-      return this;
-    }
+        public Builder serviceName(String serviceName) {
+            sagaTimeoutEvent.setServiceName(serviceName);
+            return this;
+        }
 
-    public SagaTimeoutEvent build() {
-      return sagaTimeoutEvent;
+        public Builder instanceId(String instanceId) {
+            sagaTimeoutEvent.setInstanceId(instanceId);
+            return this;
+        }
+
+        public Builder globalTxId(String globalTxId) {
+            sagaTimeoutEvent.setGlobalTxId(globalTxId);
+            return this;
+        }
+
+        public Builder createTime(Date createTime) {
+            sagaTimeoutEvent.setCreateTime(createTime);
+            return this;
+        }
+
+        public SagaTimeoutEvent build() {
+            return sagaTimeoutEvent;
+        }
     }
-  }
 }

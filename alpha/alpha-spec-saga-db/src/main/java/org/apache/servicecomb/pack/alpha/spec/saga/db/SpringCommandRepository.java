@@ -22,6 +22,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import javax.transaction.Transactional;
+
 import org.apache.servicecomb.pack.alpha.core.Command;
 import org.apache.servicecomb.pack.alpha.core.CommandRepository;
 import org.apache.servicecomb.pack.alpha.core.TaskStatus;
@@ -31,61 +32,60 @@ import org.slf4j.LoggerFactory;
 
 
 public class SpringCommandRepository implements CommandRepository {
-  private static final Logger LOG = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
+    private static final Logger LOG = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
-  private final TxEventEnvelopeRepository eventRepository;
-  private final CommandEntityRepository commandRepository;
+    private final TxEventEnvelopeRepository eventRepository;
+    private final CommandEntityRepository commandRepository;
 
-  SpringCommandRepository(TxEventEnvelopeRepository eventRepository, CommandEntityRepository commandRepository) {
-    this.eventRepository = eventRepository;
-    this.commandRepository = commandRepository;
-  }
-
-  @Override
-  public void saveCompensationCommands(String globalTxId) {
-    List<TxEvent> events = eventRepository
-        .findStartedEventsWithMatchingEndedButNotCompensatedEvents(globalTxId);
-
-    Map<String, Command> commands = new LinkedHashMap<>();
-
-    for (TxEvent event : events) {
-      commands.computeIfAbsent(event.localTxId(), k -> new Command(event));
+    SpringCommandRepository(TxEventEnvelopeRepository eventRepository, CommandEntityRepository commandRepository) {
+        this.eventRepository = eventRepository;
+        this.commandRepository = commandRepository;
     }
 
-    for (Command command : commands.values()) {
-      LOG.info("Saving compensation command {}", command);
-      try {
-        commandRepository.save(command);
-      } catch (Exception e) {
-        LOG.warn("Failed to save some command {}", command);
-      }
-      LOG.info("Saved compensation command {}", command);
+    @Override
+    public void saveCompensationCommands(String globalTxId) {
+        List<TxEvent> events = eventRepository
+                .findStartedEventsWithMatchingEndedButNotCompensatedEvents(globalTxId);
+
+        Map<String, Command> commands = new LinkedHashMap<>();
+
+        for (TxEvent event : events) {
+            commands.computeIfAbsent(event.localTxId(), k -> new Command(event));
+        }
+
+        for (Command command : commands.values()) {
+            LOG.info("Saving compensation command {}", command);
+            try {
+                commandRepository.save(command);
+            } catch (Exception e) {
+                LOG.warn("Failed to save some command {}", command);
+            }
+            LOG.info("Saved compensation command {}", command);
+        }
     }
-  }
 
-  @Override
-  public void markCommandAsDone(String globalTxId, String localTxId) {
-    commandRepository.updateStatusByGlobalTxIdAndLocalTxId(TaskStatus.DONE.name(), globalTxId, localTxId);
-  }
+    @Override
+    public void markCommandAsDone(String globalTxId, String localTxId) {
+        commandRepository.updateStatusByGlobalTxIdAndLocalTxId(TaskStatus.DONE.name(), globalTxId, localTxId);
+    }
 
-  @Override
-  public List<Command> findUncompletedCommands(String globalTxId) {
-    return commandRepository.findByGlobalTxIdAndStatus(globalTxId, TaskStatus.NEW.name());
-  }
+    @Override
+    public List<Command> findUncompletedCommands(String globalTxId) {
+        return commandRepository.findByGlobalTxIdAndStatus(globalTxId, TaskStatus.NEW.name());
+    }
 
-  @Transactional
-  @Override
-  public List<Command> findFirstCommandToCompensate() {
-    List<Command> commands = commandRepository
-        .findFirstGroupByGlobalTxIdWithoutPendingOrderByIdDesc();
+    @Transactional
+    @Override
+    public List<Command> findFirstCommandToCompensate() {
+        List<Command> commands = commandRepository.findFirstGroupByGlobalTxIdWithoutPendingOrderByIdDesc();
 
-    commands.forEach(command ->
-        commandRepository.updateStatusByGlobalTxIdAndLocalTxId(
-            TaskStatus.NEW.name(),
-            TaskStatus.PENDING.name(),
-            command.globalTxId(),
-            command.localTxId()));
+        commands.forEach(command ->
+                commandRepository.updateStatusByGlobalTxIdAndLocalTxId(
+                        TaskStatus.NEW.name(),
+                        TaskStatus.PENDING.name(),
+                        command.globalTxId(),
+                        command.localTxId()));
 
-    return commands;
-  }
+        return commands;
+    }
 }

@@ -18,47 +18,50 @@
 package org.apache.servicecomb.pack.omega.connector.grpc.core;
 
 import io.grpc.ManagedChannel;
+
 import java.util.Collection;
 import java.util.Map;
+
 import org.apache.servicecomb.pack.omega.transaction.MessageSender;
 
 public class LoadBalanceContext {
 
-  private Map<MessageSender, Long> senders;
+    private Map<MessageSender, Long> senders;
 
-  private final Collection<ManagedChannel> channels;
+    private final Collection<ManagedChannel> channels;
 
-  private final PendingTaskRunner pendingTaskRunner;
+    private final PendingTaskRunner pendingTaskRunner;
 
-  private final GrpcOnErrorHandler grpcOnErrorHandler;
+    private final GrpcOnErrorHandler grpcOnErrorHandler;
 
-  public LoadBalanceContext(Map<MessageSender, Long> senders,
-      Collection<ManagedChannel> channels, int reconnectDelay, int timeoutSeconds) {
-    this.senders = senders;
-    this.channels = channels;
-    this.pendingTaskRunner = new PendingTaskRunner(reconnectDelay);
-    this.grpcOnErrorHandler = new GrpcOnErrorHandler(pendingTaskRunner.getPendingTasks(), senders, timeoutSeconds);
-    pendingTaskRunner.start();
-  }
+    public LoadBalanceContext(Map<MessageSender, Long> senders,
+                              Collection<ManagedChannel> channels, int reconnectDelay, int timeoutSeconds) {
+        this.senders = senders;
+        this.channels = channels;
+        this.pendingTaskRunner = new PendingTaskRunner(reconnectDelay);
+        this.grpcOnErrorHandler = new GrpcOnErrorHandler(pendingTaskRunner.getPendingTasks(), senders, timeoutSeconds);
+        //启动定时任务
+        pendingTaskRunner.start();
+    }
 
-  public Map<MessageSender, Long> getSenders() {
-    return senders;
-  }
+    public Map<MessageSender, Long> getSenders() {
+        return senders;
+    }
 
-  public Collection<ManagedChannel> getChannels() {
-    return channels;
-  }
+    public Collection<ManagedChannel> getChannels() {
+        return channels;
+    }
 
-  public PendingTaskRunner getPendingTaskRunner() {
-    return pendingTaskRunner;
-  }
+    public PendingTaskRunner getPendingTaskRunner() {
+        return pendingTaskRunner;
+    }
 
-  public GrpcOnErrorHandler getGrpcOnErrorHandler() {
-    return grpcOnErrorHandler;
-  }
+    public GrpcOnErrorHandler getGrpcOnErrorHandler() {
+        return grpcOnErrorHandler;
+    }
 
-  // this is only for test
-  public void setSenders(Map<MessageSender, Long> senders) {
-    this.senders = senders;
-  }
+    // this is only for test
+    public void setSenders(Map<MessageSender, Long> senders) {
+        this.senders = senders;
+    }
 }

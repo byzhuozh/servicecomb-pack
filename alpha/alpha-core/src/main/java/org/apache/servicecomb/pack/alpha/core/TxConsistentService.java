@@ -30,28 +30,30 @@ import org.slf4j.LoggerFactory;
 
 
 public class TxConsistentService {
-  private static final Logger LOG = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
+    private static final Logger LOG = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
-  private final TxEventRepository eventRepository;
+    private final TxEventRepository eventRepository;
 
-  private final List<String> types = Arrays.asList(TxStartedEvent.name(), SagaEndedEvent.name());
+    private final List<String> types = Arrays.asList(TxStartedEvent.name(), SagaEndedEvent.name());
 
-  public TxConsistentService(TxEventRepository eventRepository) {
-    this.eventRepository = eventRepository;
-  }
-  public boolean handle(TxEvent event) {
-    if (types.contains(event.type()) && isGlobalTxAborted(event)) {
-      LOG.info("Transaction event {} rejected, because its parent with globalTxId {} was already aborted",
-          event.type(), event.globalTxId());
-      return false;
+    public TxConsistentService(TxEventRepository eventRepository) {
+        this.eventRepository = eventRepository;
     }
 
-    eventRepository.save(event);
+    public boolean handle(TxEvent event) {
+        //校验当前的全局事务是否已经中断，如果已经中断，则无需上报启动或中断事件
+        if (types.contains(event.type()) && isGlobalTxAborted(event)) {
+            LOG.info("Transaction event {} rejected, because its parent with globalTxId {} was already aborted",
+                    event.type(), event.globalTxId());
+            return false;
+        }
 
-    return true;
-  }
+        eventRepository.save(event);
 
-  private boolean isGlobalTxAborted(TxEvent event) {
-    return !eventRepository.findTransactions(event.globalTxId(), TxAbortedEvent.name()).isEmpty();
-  }
+        return true;
+    }
+
+    private boolean isGlobalTxAborted(TxEvent event) {
+        return !eventRepository.findTransactions(event.globalTxId(), TxAbortedEvent.name()).isEmpty();
+    }
 }

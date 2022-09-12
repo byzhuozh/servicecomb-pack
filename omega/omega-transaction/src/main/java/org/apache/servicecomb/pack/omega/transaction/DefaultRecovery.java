@@ -30,10 +30,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * DefaultRecovery is used to execute business logic once.
- * The corresponding events will report to alpha server before and after the execution of business logic.
- * If there are errors while executing the business logic, a TxAbortedEvent will be reported to alpha.
- *
+ * DefaultRecovery is used to execute business logic once. The corresponding events will report to alpha server before
+ * and after the execution of business logic. If there are errors while executing the business logic, a TxAbortedEvent
+ * will be reported to alpha.
+ * <p>
  *                 pre                       post
  *     request --------- 2.business logic --------- response
  *                 \                          |
@@ -43,48 +43,56 @@ import org.slf4j.LoggerFactory;
  *                            alpha
  */
 public class DefaultRecovery extends AbstractRecoveryPolicy {
-  private static final Logger LOG = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
+    private static final Logger LOG = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
-  @Override
-  public Object applyTo(ProceedingJoinPoint joinPoint, Compensable compensable, CompensableInterceptor interceptor,
-      OmegaContext context, String parentTxId, int forwardRetries) throws Throwable {
-    Method method = ((MethodSignature) joinPoint.getSignature()).getMethod();
-    LOG.debug("Intercepting compensable method {} with context {}", method.toString(), context);
+    @Override
+    public Object applyTo(ProceedingJoinPoint joinPoint, Compensable compensable, CompensableInterceptor interceptor,
+                          OmegaContext context, String parentTxId, int forwardRetries) throws Throwable {
+        Method method = ((MethodSignature) joinPoint.getSignature()).getMethod();
+        LOG.debug("Intercepting compensable method {} with context {}", method.toString(), context);
 
-    String compensationSignature =
-        compensable.compensationMethod().isEmpty() ? "" : compensationMethodSignature(joinPoint, compensable, method);
+        //补偿方法的签名  public boolean com.zhuo.saga.service.BookingServiceImpl.cancel(com.zhuo.saga.domain.Booking)
+        String compensationSignature =
+                compensable.compensationMethod()
+                        .isEmpty() ? "" : compensationMethodSignature(joinPoint, compensable, method);
 
-    String retrySignature = (forwardRetries != 0 || compensationSignature.isEmpty()) ? method.toString() : "";
+        String retrySignature = (forwardRetries != 0 || compensationSignature.isEmpty()) ? method.toString() : "";
 
-    AlphaResponse response = interceptor.preIntercept(parentTxId, compensationSignature, compensable.forwardTimeout(),
-            retrySignature, forwardRetries, compensable.forwardTimeout(),
-            compensable.reverseRetries(), compensable.reverseTimeout(), compensable.retryDelayInMilliseconds(), joinPoint.getArgs());
-    if (response.aborted()) {
-      String abortedLocalTxId = context.localTxId();
-      context.setLocalTxId(parentTxId);
-      throw new InvalidTransactionException("Abort sub transaction " + abortedLocalTxId +
-          " because global transaction " + context.globalTxId() + " has already aborted.");
+        // 上报 TxStartedEvent 事件
+        AlphaResponse response = interceptor.preIntercept(parentTxId, compensationSignature, compensable.forwardTimeout(),
+                retrySignature, forwardRetries, compensable.forwardTimeout(),
+                compensable.reverseRetries(), compensable.reverseTimeout(), compensable.retryDelayInMilliseconds(), joinPoint.getArgs());
+
+        if (response.aborted()) {
+            String abortedLocalTxId = context.localTxId();
+            context.setLocalTxId(parentTxId);
+            throw new InvalidTransactionException("Abort sub transaction " + abortedLocalTxId +
+                    " because global transaction " + context.globalTxId() + " has already aborted.");
+        }
+
+        try {
+            // 执行目标方法
+            Object result = joinPoint.proceed();
+
+            // 上报 TxEndedEvent 事件
+            interceptor.postIntercept(parentTxId, compensationSignature);
+
+            return result;
+        } catch (Throwable throwable) {
+            if (compensable.forwardRetries() == 0 ||
+                    (compensable.forwardRetries() > 0 && forwardRetries == 1)) {
+                // 上报 TxAbortedEvent 事件
+                interceptor.onError(parentTxId, compensationSignature, throwable);
+            }
+            throw throwable;
+        }
     }
 
-    try {
-      Object result = joinPoint.proceed();
-      interceptor.postIntercept(parentTxId, compensationSignature);
-
-      return result;
-    } catch (Throwable throwable) {
-      if (compensable.forwardRetries() == 0 || (compensable.forwardRetries() > 0
-          && forwardRetries == 1)) {
-        interceptor.onError(parentTxId, compensationSignature, throwable);
-      }
-      throw throwable;
+    String compensationMethodSignature(ProceedingJoinPoint joinPoint, Compensable compensable, Method method)
+            throws NoSuchMethodException {
+        return joinPoint.getTarget()
+                .getClass()
+                .getDeclaredMethod(compensable.compensationMethod(), method.getParameterTypes())
+                .toString();
     }
-  }
-
-  String compensationMethodSignature(ProceedingJoinPoint joinPoint, Compensable compensable, Method method)
-      throws NoSuchMethodException {
-    return joinPoint.getTarget()
-        .getClass()
-        .getDeclaredMethod(compensable.compensationMethod(), method.getParameterTypes())
-        .toString();
-  }
 }

@@ -26,6 +26,7 @@ import io.grpc.netty.NettyChannelBuilder;
 import io.netty.handler.ssl.SslContext;
 import io.netty.handler.ssl.SslContextBuilder;
 import io.netty.handler.ssl.SslProvider;
+
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -44,112 +45,115 @@ import org.apache.servicecomb.pack.omega.transaction.MessageSender;
 
 public class LoadBalanceContextBuilder {
 
-  private final AlphaClusterConfig clusterConfig;
+    private final AlphaClusterConfig clusterConfig;
 
-  private final ServiceConfig serviceConfig;
+    private final ServiceConfig serviceConfig;
 
-  private final int reconnectDelay;
+    private final int reconnectDelay;
 
-  private final int timeoutSeconds;
+    private final int timeoutSeconds;
 
-  private final TransactionType transactionType;
+    private final TransactionType transactionType;
 
-  public LoadBalanceContextBuilder(TransactionType transactionType,
-      AlphaClusterConfig clusterConfig, ServiceConfig serviceConfig, int reconnectDelay, int timeoutSeconds) {
-    this.transactionType = transactionType;
-    this.clusterConfig = clusterConfig;
-    this.serviceConfig = serviceConfig;
-    this.reconnectDelay = reconnectDelay;
-    this.timeoutSeconds = timeoutSeconds;
-  }
-
-  public LoadBalanceContext build() {
-    if (clusterConfig.getAddresses().isEmpty()) {
-      throw new IllegalArgumentException("No reachable cluster address provided");
+    public LoadBalanceContextBuilder(TransactionType transactionType,
+                                     AlphaClusterConfig clusterConfig, ServiceConfig serviceConfig, int reconnectDelay, int timeoutSeconds) {
+        this.transactionType = transactionType;
+        this.clusterConfig = clusterConfig;
+        this.serviceConfig = serviceConfig;
+        this.reconnectDelay = reconnectDelay;
+        this.timeoutSeconds = timeoutSeconds;
     }
 
-    Optional<SslContext> sslContext = buildSslContext(clusterConfig);
-    Map<MessageSender, Long> senders = new ConcurrentHashMap<>();
-    Collection<ManagedChannel> channels = new ArrayList<>(clusterConfig.getAddresses().size());
-    LoadBalanceContext loadContext = new LoadBalanceContext(senders, channels, reconnectDelay, timeoutSeconds);
+    public LoadBalanceContext build() {
+        if (clusterConfig.getAddresses().isEmpty()) {
+            throw new IllegalArgumentException("No reachable cluster address provided");
+        }
 
-    for (String address : clusterConfig.getAddresses()) {
-      ManagedChannel channel = buildChannel(address, sslContext);
-      channels.add(channel);
-      MessageSender messageSender = buildSender(address, channel, clusterConfig, serviceConfig, loadContext);
-      senders.put(messageSender, 0L);
-    }
-    return loadContext;
-  }
+        Optional<SslContext> sslContext = buildSslContext(clusterConfig);
+        Map<MessageSender, Long> senders = new ConcurrentHashMap<>();
+        Collection<ManagedChannel> channels = new ArrayList<>(clusterConfig.getAddresses().size());
 
-  private ManagedChannel buildChannel(String address, Optional<SslContext> sslContext) {
-    if (sslContext.isPresent()) {
-      return NettyChannelBuilder.forTarget(address)
-          .negotiationType(NegotiationType.TLS)
-          .sslContext(sslContext.get())
-          .build();
-    } else {
-      return ManagedChannelBuilder
-          .forTarget(address).usePlaintext()
-          .build();
-    }
-  }
+        LoadBalanceContext loadContext = new LoadBalanceContext(senders, channels, reconnectDelay, timeoutSeconds);
 
-  private MessageSender buildSender(
-      String address, ManagedChannel channel, AlphaClusterConfig clusterConfig,
-      ServiceConfig serviceConfig, LoadBalanceContext loadContext) {
-    switch (transactionType) {
-      case TCC:
-        return new GrpcTccClientMessageSender(
-            serviceConfig,
-            channel,
-            address,
-            clusterConfig.getTccMessageHandler(),
-            loadContext);
-      case SAGA:
-        return new GrpcSagaClientMessageSender(
-            address,
-            channel,
-            clusterConfig.getMessageSerializer(),
-            clusterConfig.getMessageDeserializer(),
-            serviceConfig,
-            clusterConfig.getMessageHandler(),
-            loadContext
-        );
-        default:
-    }
-      return null;
-  }
-
-  private Optional<SslContext> buildSslContext(AlphaClusterConfig clusterConfig) {
-    if (!clusterConfig.isEnableSSL()) {
-      return Optional.absent();
+        //alpha 集群地址
+        for (String address : clusterConfig.getAddresses()) {
+            ManagedChannel channel = buildChannel(address, sslContext);
+            channels.add(channel);
+            //构建 saga 的 GrpcSagaClientMessageSender 客户端
+            MessageSender messageSender = buildSender(address, channel, clusterConfig, serviceConfig, loadContext);
+            senders.put(messageSender, 0L);
+        }
+        return loadContext;
     }
 
-    SslContextBuilder builder = GrpcSslContexts.forClient();
-    // openssl must be used because some older JDk does not support cipher suites required by http2,
-    // and the performance of JDK ssl is pretty low compared to openssl.
-    builder.sslProvider(SslProvider.OPENSSL);
-
-    Properties prop = new Properties();
-    try {
-      prop.load(LoadBalanceContextBuilder.class.getClassLoader().getResourceAsStream("ssl.properties"));
-    } catch (IOException e) {
-      throw new IllegalArgumentException("Unable to read ssl.properties.", e);
+    private ManagedChannel buildChannel(String address, Optional<SslContext> sslContext) {
+        if (sslContext.isPresent()) {
+            return NettyChannelBuilder.forTarget(address)
+                    .negotiationType(NegotiationType.TLS)
+                    .sslContext(sslContext.get())
+                    .build();
+        } else {
+            return ManagedChannelBuilder
+                    .forTarget(address).usePlaintext()
+                    .build();
+        }
     }
 
-    builder.protocols(prop.getProperty("protocols").split(","));
-    builder.ciphers(Arrays.asList(prop.getProperty("ciphers").split(",")));
-    builder.trustManager(new File(clusterConfig.getCertChain()));
-
-    if (clusterConfig.isEnableMutualAuth()) {
-      builder.keyManager(new File(clusterConfig.getCert()), new File(clusterConfig.getKey()));
+    private MessageSender buildSender(
+            String address, ManagedChannel channel, AlphaClusterConfig clusterConfig,
+            ServiceConfig serviceConfig, LoadBalanceContext loadContext) {
+        switch (transactionType) {
+            case TCC:
+                return new GrpcTccClientMessageSender(
+                        serviceConfig,
+                        channel,
+                        address,
+                        clusterConfig.getTccMessageHandler(),
+                        loadContext);
+            case SAGA:
+                return new GrpcSagaClientMessageSender(
+                        address,
+                        channel,
+                        clusterConfig.getMessageSerializer(),
+                        clusterConfig.getMessageDeserializer(),
+                        serviceConfig,
+                        clusterConfig.getMessageHandler(),
+                        loadContext
+                );
+            default:
+        }
+        return null;
     }
 
-    try {
-      return Optional.of(builder.build());
-    } catch (SSLException e) {
-      throw new IllegalArgumentException("Unable to build SslContext", e);
+    private Optional<SslContext> buildSslContext(AlphaClusterConfig clusterConfig) {
+        if (!clusterConfig.isEnableSSL()) {
+            return Optional.absent();
+        }
+
+        SslContextBuilder builder = GrpcSslContexts.forClient();
+        // openssl must be used because some older JDk does not support cipher suites required by http2,
+        // and the performance of JDK ssl is pretty low compared to openssl.
+        builder.sslProvider(SslProvider.OPENSSL);
+
+        Properties prop = new Properties();
+        try {
+            prop.load(LoadBalanceContextBuilder.class.getClassLoader().getResourceAsStream("ssl.properties"));
+        } catch (IOException e) {
+            throw new IllegalArgumentException("Unable to read ssl.properties.", e);
+        }
+
+        builder.protocols(prop.getProperty("protocols").split(","));
+        builder.ciphers(Arrays.asList(prop.getProperty("ciphers").split(",")));
+        builder.trustManager(new File(clusterConfig.getCertChain()));
+
+        if (clusterConfig.isEnableMutualAuth()) {
+            builder.keyManager(new File(clusterConfig.getCert()), new File(clusterConfig.getKey()));
+        }
+
+        try {
+            return Optional.of(builder.build());
+        } catch (SSLException e) {
+            throw new IllegalArgumentException("Unable to build SslContext", e);
+        }
     }
-  }
 }

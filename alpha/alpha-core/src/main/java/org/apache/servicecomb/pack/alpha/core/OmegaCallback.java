@@ -20,6 +20,7 @@ package org.apache.servicecomb.pack.alpha.core;
 import org.apache.servicecomb.pack.alpha.core.fsm.CompensateAckType;
 
 public interface OmegaCallback {
+
   void compensate(TxEvent event);
 
   default void disconnect() {

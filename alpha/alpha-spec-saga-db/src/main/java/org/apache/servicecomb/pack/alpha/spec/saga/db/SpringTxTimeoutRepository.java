@@ -20,6 +20,7 @@ package org.apache.servicecomb.pack.alpha.spec.saga.db;
 import java.lang.invoke.MethodHandles;
 import java.util.List;
 import javax.transaction.Transactional;
+
 import org.apache.servicecomb.pack.alpha.core.TaskStatus;
 import org.apache.servicecomb.pack.alpha.core.TxTimeout;
 import org.apache.servicecomb.pack.alpha.core.TxTimeoutRepository;
@@ -28,34 +29,37 @@ import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.PageRequest;
 
 public class SpringTxTimeoutRepository implements TxTimeoutRepository {
-  private static final Logger LOG = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
+    private static final Logger LOG = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
-  private final TxTimeoutEntityRepository timeoutRepo;
+    private final TxTimeoutEntityRepository timeoutRepo;
 
-  SpringTxTimeoutRepository(TxTimeoutEntityRepository timeoutRepo) {
-    this.timeoutRepo = timeoutRepo;
-  }
-
-  @Override
-  public void save(TxTimeout timeout) {
-    try {
-      timeoutRepo.save(timeout);
-    } catch (Exception ignored) {
-      LOG.warn("Failed to save some timeout {}", timeout);
+    SpringTxTimeoutRepository(TxTimeoutEntityRepository timeoutRepo) {
+        this.timeoutRepo = timeoutRepo;
     }
-  }
 
-  @Override
-  public void markTimeoutAsDone() {
-    timeoutRepo.updateStatusOfFinishedTx();
-  }
+    @Override
+    public void save(TxTimeout timeout) {
+        try {
+            timeoutRepo.save(timeout);
+        } catch (Exception ignored) {
+            LOG.warn("Failed to save some timeout {}", timeout);
+        }
+    }
 
-  @Transactional
-  @Override
-  public List<TxTimeout> findFirstTimeout() {
-    List<TxTimeout> timeoutEvents = timeoutRepo.findFirstTimeoutTxOrderByExpireTimeAsc(PageRequest.of(0, 1));
-    timeoutEvents.forEach(event -> timeoutRepo
-        .updateStatusByGlobalTxIdAndLocalTxId(TaskStatus.PENDING.name(), event.globalTxId(), event.localTxId()));
-    return timeoutEvents;
-  }
+    @Override
+    public void markTimeoutAsDone() {
+        timeoutRepo.updateStatusOfFinishedTx();
+    }
+
+    @Transactional
+    @Override
+    public List<TxTimeout> findFirstTimeout() {
+        //查询超时的事件数据，状态为 NEW
+        List<TxTimeout> timeoutEvents = timeoutRepo.findFirstTimeoutTxOrderByExpireTimeAsc(PageRequest.of(0, 1));
+
+        //更新状态为 PENDING
+        timeoutEvents.forEach(event -> timeoutRepo
+                .updateStatusByGlobalTxIdAndLocalTxId(TaskStatus.PENDING.name(), event.globalTxId(), event.localTxId()));
+        return timeoutEvents;
+    }
 }

@@ -14,6 +14,8 @@
 ## See the License for the specific language governing permissions and
 ## limitations under the License.
 ## ---------------------------------------------------------------------------
+
+
 spring:
   application:
     name: booking
@@ -28,3 +30,11 @@ spring:
 alpha:
   cluster:
     address: alpha-server.servicecomb.io:8080
+
+server:
+  port: 8095
+
+
+omega:
+  instance:
+    instanceId: ${spring.application.name}-${spring.cloud.client.hostname}-${server.port}

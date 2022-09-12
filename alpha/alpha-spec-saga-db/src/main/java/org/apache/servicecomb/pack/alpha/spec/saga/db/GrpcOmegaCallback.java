@@ -28,26 +28,27 @@ import org.apache.servicecomb.pack.contract.grpc.GrpcCompensateCommand;
 
 class GrpcOmegaCallback implements OmegaCallback {
 
-  private final StreamObserver<GrpcCompensateCommand> observer;
+    private final StreamObserver<GrpcCompensateCommand> observer;
 
-  GrpcOmegaCallback(StreamObserver<GrpcCompensateCommand> observer) {
-    this.observer = observer;
-  }
+    GrpcOmegaCallback(StreamObserver<GrpcCompensateCommand> observer) {
+        this.observer = observer;
+    }
 
-  @Override
-  public void compensate(TxEvent event) {
-    GrpcCompensateCommand command = GrpcCompensateCommand.newBuilder()
-        .setGlobalTxId(event.globalTxId())
-        .setLocalTxId(event.localTxId())
-        .setParentTxId(event.parentTxId() == null ? "" : event.parentTxId())
-        .setCompensationMethod(event.compensationMethod())
-        .setPayloads(ByteString.copyFrom(event.payloads()))
-        .build();
-    observer.onNext(command);
-  }
+    @Override
+    public void compensate(TxEvent event) {
+        GrpcCompensateCommand command = GrpcCompensateCommand.newBuilder()
+                .setGlobalTxId(event.globalTxId())
+                .setLocalTxId(event.localTxId())
+                .setParentTxId(event.parentTxId() == null ? "" : event.parentTxId())
+                .setCompensationMethod(event.compensationMethod())
+                .setPayloads(ByteString.copyFrom(event.payloads()))
+                .build();
+        //触发 omega 命令的执行
+        observer.onNext(command);
+    }
 
-  @Override
-  public void disconnect() {
-    observer.onCompleted();
-  }
+    @Override
+    public void disconnect() {
+        observer.onCompleted();
+    }
 }

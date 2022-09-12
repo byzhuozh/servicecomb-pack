@@ -46,10 +46,10 @@ public class TxTimeout {
   @Version
   private long version;
 
-  TxTimeout() {
+  public TxTimeout() {
   }
 
-  TxTimeout(long eventId, String serviceName, String instanceId, String globalTxId, String localTxId,
+  public TxTimeout(long eventId, String serviceName, String instanceId, String globalTxId, String localTxId,
       String parentTxId, String type, Date expiryTime, String status) {
     this.eventId = eventId;
     this.serviceName = serviceName;

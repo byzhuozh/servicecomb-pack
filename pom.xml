@@ -37,8 +37,9 @@
     <module>alpha</module>
     <module>pack-contracts</module>
     <module>pack-common</module>
-    <module>integration-tests</module>
+<!--    <module>integration-tests</module>-->
     <module>web</module>
+    <module>demo</module>
   </modules>
 
   <properties>

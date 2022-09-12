@@ -19,6 +19,7 @@ package org.apache.servicecomb.pack.alpha.server;
 
 import com.google.common.eventbus.EventBus;
 import io.grpc.BindableService;
+
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
@@ -29,6 +30,7 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ScheduledExecutorService;
 import javax.annotation.PostConstruct;
 import javax.annotation.PreDestroy;
+
 import org.apache.servicecomb.pack.alpha.core.CompositeOmegaCallback;
 import org.apache.servicecomb.pack.alpha.core.NodeStatus;
 import org.apache.servicecomb.pack.alpha.core.OmegaCallback;
@@ -47,72 +49,82 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 public class AlphaConfig {
 
-  private final BlockingQueue<Runnable> pendingCompensations = new LinkedBlockingQueue<>();
-  private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
+    /**
+     * 缓存补偿执行失败的任务，等待定时线程重新触发
+     */
+    private final BlockingQueue<Runnable> pendingCompensations = new LinkedBlockingQueue<>();
+    private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
 
-  @Value("${alpha.compensation.retry.delay:3000}")
-  private int delay;
+    @Value("${alpha.compensation.retry.delay:3000}")
+    private int delay;
 
-  @Value("${alpha.tx.timeout-seconds:600}")
-  private int globalTxTimeoutSeconds;
+    @Value("${alpha.tx.timeout-seconds:600}")
+    private int globalTxTimeoutSeconds;
 
-  @Value("${alpha.cluster.master.enabled:false}")
-  private boolean masterEnabled;
+    @Value("${alpha.cluster.master.enabled:false}")
+    private boolean masterEnabled;
 
-  @Autowired
-  ApplicationContext applicationContext;
+    @Autowired
+    ApplicationContext applicationContext;
 
-  @Autowired
-  ApplicationEventPublisher applicationEventPublisher;
+    @Autowired
+    ApplicationEventPublisher applicationEventPublisher;
 
-  @Bean("alphaEventBus")
-  EventBus alphaEventBus() {
-    return new EventBus("alphaEventBus");
-  }
-
-  @Bean
-  Map<String, Map<String, OmegaCallback>> omegaCallbacks() {
-    return new ConcurrentHashMap<>();
-  }
-
-  @Bean
-  OmegaCallback omegaCallback(Map<String, Map<String, OmegaCallback>> callbacks) {
-    return new PushBackOmegaCallback(pendingCompensations, new CompositeOmegaCallback(callbacks));
-  }
-
-  @Bean
-  ScheduledExecutorService compensationScheduler() {
-    return scheduler;
-  }
-
-  @Bean
-  NodeStatus nodeStatus() {
-    if (masterEnabled) {
-      return new NodeStatus(NodeStatus.TypeEnum.SLAVE);
-    } else {
-      return new NodeStatus(NodeStatus.TypeEnum.MASTER);
+    @Bean("alphaEventBus")
+    EventBus alphaEventBus() {
+        return new EventBus("alphaEventBus");
     }
-  }
 
-  @Bean
-  ServerStartable serverStartableWithAkka(GrpcServerConfig serverConfig,
-      @Qualifier("alphaEventBus") EventBus eventBus, List<BindableService> bindableServices)
-      throws IOException {
-    ServerStartable bootstrap = new GrpcStartable(serverConfig, eventBus,
-        bindableServices.toArray(new BindableService[0]));
-    new Thread(bootstrap::start).start();
-    return bootstrap;
-  }
 
-  @PostConstruct
-  void init() {
-    //https://github.com/elastic/elasticsearch/issues/25741
-    System.setProperty("es.set.netty.runtime.available.processors", "false");
-    new PendingTaskRunner(pendingCompensations, delay).run();
-  }
+    /**
+     * 1. GrpcTxEventEndpointImpl#onConnected 监听 omega 客户端链接，并缓存
+     * 2. PushBackOmegaCallback --> CompositeOmegaCallback#compensate  根据服务名和实例Id 进行匹配 omega客户端，执行补偿触发
+     */
+    @Bean
+    Map<String, Map<String, OmegaCallback>> omegaCallbacks() {
+        return new ConcurrentHashMap<>();
+    }
 
-  @PreDestroy
-  void shutdown() {
-    scheduler.shutdownNow();
-  }
+    @Bean
+    OmegaCallback omegaCallback(Map<String, Map<String, OmegaCallback>> callbacks) {
+        return new PushBackOmegaCallback(pendingCompensations, new CompositeOmegaCallback(callbacks));
+    }
+
+    @Bean
+    ScheduledExecutorService compensationScheduler() {
+        return scheduler;
+    }
+
+    @Bean
+    NodeStatus nodeStatus() {
+        if (masterEnabled) {
+            return new NodeStatus(NodeStatus.TypeEnum.SLAVE);
+        } else {
+            return new NodeStatus(NodeStatus.TypeEnum.MASTER);
+        }
+    }
+
+    @Bean
+    ServerStartable serverStartableWithAkka(GrpcServerConfig serverConfig,
+                                            @Qualifier("alphaEventBus") EventBus eventBus,
+                                            List<BindableService> bindableServices)  // 消息处理服务
+            throws IOException {
+        //启动内部通信server
+        ServerStartable bootstrap = new GrpcStartable(serverConfig, eventBus,
+                bindableServices.toArray(new BindableService[0]));
+        new Thread(bootstrap::start).start();
+        return bootstrap;
+    }
+
+    @PostConstruct
+    void init() {
+        //https://github.com/elastic/elasticsearch/issues/25741
+        System.setProperty("es.set.netty.runtime.available.processors", "false");
+        new PendingTaskRunner(pendingCompensations, delay).run();
+    }
+
+    @PreDestroy
+    void shutdown() {
+        scheduler.shutdownNow();
+    }
 }

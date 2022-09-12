@@ -37,88 +37,88 @@ import java.util.Map;
 @RestController
 public class BookingController {
 
-  private static final Logger LOG = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
+    private static final Logger LOG = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
-  @Value("${car.service.address:http://car.servicecomb.io:8080}")
-  private String carServiceUrl;
+    @Value("${car.service.address:http://car.servicecomb.io:8086}")
+    private String carServiceUrl;
 
-  @Value("${hotel.service.address:http://hotel.servicecomb.io:8080}")
-  private String hotelServiceUrl;
+    @Value("${hotel.service.address:http://hotel.servicecomb.io:8087}")
+    private String hotelServiceUrl;
 
-  @Autowired
-  private RestTemplate template;
+    @Autowired
+    private RestTemplate template;
 
-  @SagaStart
-  @PostMapping("/booking/{name}/{rooms}/{cars}")
-  public String order(@PathVariable String name, @PathVariable Integer rooms,
-      @PathVariable Integer cars) throws Throwable {
+    @SagaStart
+    @PostMapping("/booking/{name}/{rooms}/{cars}")
+    public String order(@PathVariable String name, @PathVariable Integer rooms,
+                        @PathVariable Integer cars) throws Throwable {
 
-    if (cars < 0) {
-      throw new Exception("The cars order quantity must be greater than 0");
-    }
-
-    template.postForEntity(
-        carServiceUrl + "/order/{name}/{cars}",
-        null, String.class, name, cars);
-
-    postCarBooking();
-
-    if (rooms < 0) {
-      throw new Exception("The rooms order quantity must be greater than 0");
-    }
-
-    template.postForEntity(
-        hotelServiceUrl + "/order/{name}/{rooms}",
-        null, String.class, name, rooms);
-
-    postBooking();
-
-    return name + " booking " + rooms + " rooms and " + cars + " cars OK";
-  }
-
-  // This method is used by the byteman to inject exception here
-  private void postCarBooking() throws Throwable {
-
-  }
-
-  // This method is used by the byteman to inject the faults such as the timeout or the crash
-  private void postBooking() throws Throwable {
-
-  }
-
-  // This method is used by the byteman trigger shutdown the master node in the Alpha server cluster
-  private void alphaMasterShutdown() {
-    String alphaRestAddress = System.getenv("alpha.rest.address");
-    LOG.info("alpha.rest.address={}", alphaRestAddress);
-    List<String> addresss = Arrays.asList(alphaRestAddress.split(","));
-
-    addresss.stream().filter(address -> {
-      // use the actuator alpha endpoint to find the alpha master node
-      try {
-        ResponseEntity<String> responseEntity = template
-            .getForEntity(address + "/actuator/alpha", String.class);
-        ObjectMapper mapper = new ObjectMapper();
-        if (responseEntity.getStatusCode() == HttpStatus.OK) {
-          String json = responseEntity.getBody();
-          Map<String, String> map = mapper.readValue(json, Map.class);
-          if (map.get("nodeType").equalsIgnoreCase("MASTER")) {
-            return true;
-          }
+        if (cars < 0) {
+            throw new Exception("The cars order quantity must be greater than 0");
         }
-      } catch (Exception ex) {
-        LOG.error("", ex);
-      }
-      return false;
-    }).forEach(address -> {
-      // call shutdown endpoint to shutdown the alpha master node
-      HttpHeaders headers = new HttpHeaders();
-      headers.setContentType(MediaType.APPLICATION_JSON);
-      HttpEntity request = new HttpEntity(headers);
-      ResponseEntity<String> responseEntity = template
-          .postForEntity(address + "/actuator/shutdown", request, String.class);
-      if (responseEntity.getStatusCode() == HttpStatus.OK) {
-        LOG.info("Alpah master node {} shutdown", address);
-      }
-    });
-  }
+
+//        template.postForEntity(
+//                carServiceUrl + "/order/{name}/{cars}",
+//                null, String.class, name, cars);
+
+        postCarBooking();
+
+        if (rooms < 0) {
+            throw new Exception("The rooms order quantity must be greater than 0");
+        }
+
+//        template.postForEntity(
+//                hotelServiceUrl + "/order/{name}/{rooms}",
+//                null, String.class, name, rooms);
+
+        postBooking();
+
+        return name + " booking " + rooms + " rooms and " + cars + " cars OK";
+    }
+
+    // This method is used by the byteman to inject exception here
+    private void postCarBooking() throws Throwable {
+
+    }
+
+    // This method is used by the byteman to inject the faults such as the timeout or the crash
+    private void postBooking() throws Throwable {
+
+    }
+
+    // This method is used by the byteman trigger shutdown the master node in the Alpha server cluster
+    private void alphaMasterShutdown() {
+        String alphaRestAddress = System.getenv("alpha.rest.address");
+        LOG.info("alpha.rest.address={}", alphaRestAddress);
+        List<String> addresss = Arrays.asList(alphaRestAddress.split(","));
+
+        addresss.stream().filter(address -> {
+            // use the actuator alpha endpoint to find the alpha master node
+            try {
+                ResponseEntity<String> responseEntity = template
+                        .getForEntity(address + "/actuator/alpha", String.class);
+                ObjectMapper mapper = new ObjectMapper();
+                if (responseEntity.getStatusCode() == HttpStatus.OK) {
+                    String json = responseEntity.getBody();
+                    Map<String, String> map = mapper.readValue(json, Map.class);
+                    if (map.get("nodeType").equalsIgnoreCase("MASTER")) {
+                        return true;
+                    }
+                }
+            } catch (Exception ex) {
+                LOG.error("", ex);
+            }
+            return false;
+        }).forEach(address -> {
+            // call shutdown endpoint to shutdown the alpha master node
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_JSON);
+            HttpEntity request = new HttpEntity(headers);
+            ResponseEntity<String> responseEntity = template
+                    .postForEntity(address + "/actuator/shutdown", request, String.class);
+            if (responseEntity.getStatusCode() == HttpStatus.OK) {
+                LOG.info("Alpah master node {} shutdown", address);
+            }
+        });
+    }
 }

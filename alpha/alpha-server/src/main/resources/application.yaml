@@ -1,22 +1,6 @@
-## ---------------------------------------------------------------------------
-## Licensed to the Apache Software Foundation (ASF) under one or more
-## contributor license agreements.  See the NOTICE file distributed with
-## this work for additional information regarding copyright ownership.
-## The ASF licenses this file to You under the Apache License, Version 2.0
-## (the "License"); you may not use this file except in compliance with
-## the License.  You may obtain a copy of the License at
-##
-##      http://www.apache.org/licenses/LICENSE-2.0
-##
-## Unless required by applicable law or agreed to in writing, software
-## distributed under the License is distributed on an "AS IS" BASIS,
-## WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-## See the License for the specific language governing permissions and
-## limitations under the License.
-## ---------------------------------------------------------------------------
 server:
   port: 8090
-  host: 0.0.0.0
+  host: 172.31.10.32
 
 alpha:
   server:
@@ -25,30 +9,30 @@ alpha:
   spec:
     names: saga-db
     saga:
-      akka:
-        channel:
-          name: memory
-          memory:
-            max-length: -1
-          kafka:
-            topic: servicecomb-pack-actor-event
-            bootstrap-servers: 127.0.0.1:9092
-            numPartitions: 6
-            replicationFactor: 1
-            consumer:
-              group-id: servicecomb-pack
-              auto.offset.reset: earliest
-              enable.auto.commit: false
-            producer:
-              batch-size: 16384
-              retries: 0
-              buffer.memory: 33554432
-        repository:
-          name: elasticsearch
-          elasticsearch:
-            uris: http://localhost:9200
-            batch-size: 100
-            refresh-time: 5000
+#      akka:
+#        channel:
+#          name: memory
+#          memory:
+#            max-length: -1
+#          kafka:
+#            topic: servicecomb-pack-actor-event
+#            bootstrap-servers: 127.0.0.1:9092
+#            numPartitions: 6
+#            replicationFactor: 1
+#            consumer:
+#              group-id: servicecomb-pack
+#              auto.offset.reset: earliest
+#              enable.auto.commit: false
+#            producer:
+#              batch-size: 16384
+#              retries: 0
+#              buffer.memory: 33554432
+#        repository:
+#          name: elasticsearch
+#          elasticsearch:
+#            uris: http://localhost:9200
+#            batch-size: 100
+#            refresh-time: 5000
       db:
         datasource:
           username: sa
@@ -59,42 +43,51 @@ alpha:
           enabled: true
           type: jdbc
           expire: 5000
-    tcc:
-      db:
-        memory-mode: true
-        datasource:
-          username: sa
-          password:
-          url: jdbc:hsqldb:mem:saga
-          initialization-mode: always
+#    tcc:
+#      db:
+#        memory-mode: true
+#        datasource:
+#          username: sa
+#          password:
+#          url: jdbc:hsqldb:mem:saga
+#          initialization-mode: always
 
   feature:
     nativetransport: false # Default disabled Netty Native Transport
 
 spring:
+  profiles: mysql
+  datasource:
+    username: root
+    password: 123456789
+    url: jdbc:mysql://127.0.0.1:3306/saga?useSSL=false
+    platform: mysql
+    continue-on-error: false
   main:
     allow-bean-definition-overriding: true
   jpa:
     properties:
       eclipselink:
         ddl-generation: none
-  cloud:
-    consul:
-      host: 0.0.0.0
-      port: 8500
-      discovery:
-        serviceName: {spring.application.name}
-        healthCheckPath: /actuator/health
-        healthCheckInterval: 10s
-        instanceId: ${spring.application.name}-${alpha.server.host}-${random.value}
-        tags: alpha-server-host=${alpha.server.host},alpha-server-port=${alpha.server.port}
+#  cloud:
+#    consul:
+#      host: 0.0.0.0
+#      port: 8500
+#      discovery:
+#        serviceName: {spring.application.name}
+#        healthCheckPath: /actuator/health
+#        healthCheckInterval: 10s
+#        instanceId: ${spring.application.name}-${alpha.server.host}-${random.value}
+#        tags: alpha-server-host=${alpha.server.host},alpha-server-port=${alpha.server.port}
 
 eureka:
   client:
-    enabled: false
-  instance:
-    metadataMap:
-      servicecomb-alpha-server: ${alpha.server.host}:${alpha.server.port}
+    enabled: true
+    service-url:
+      defaultZone: http://127.0.0.1:8761/eureka
+#  instance:
+#    metadataMap:
+#      servicecomb-alpha-server: ${alpha.server.host}:${alpha.server.port}
 
 
 akkaConfig:
@@ -149,113 +142,101 @@ management:
     rabbit:
       enabled: false
 
----
-spring:
-  profiles: ssl
-alpha:
-  server:
-    ssl:
-      enable: true
-      cert: server.crt
-      key: server.pem
-      mutualAuth: true
-      clientCert: client.crt
+#---
+#spring:
+#  profiles: ssl
+#alpha:
+#  server:
+#    ssl:
+#      enable: true
+#      cert: server.crt
+#      key: server.pem
+#      mutualAuth: true
+#      clientCert: client.crt
 
----
-spring:
-  profiles: prd
-  jpa:
-    properties:
-      eclipselink:
-        ddl-generation: none
-alpha:
-  spec:
-    saga:
-      db:
-        datasource:
-          username: saga
-          password: password
-          url: jdbc:postgresql://postgresql.servicecomb.io:5432/saga?useSSL=false
-          platform: postgresql
-          continue-on-error: false
-    tcc:
-      db:
-        memory-mode: false
-        datasource:
-          username: saga
-          password: password
-          url: jdbc:postgresql://postgresql.servicecomb.io:5432/saga?useSSL=false
-          platform: postgresql
-          continue-on-error: false
----
-spring:
-  profiles: mysql
-  datasource:
-    username: saga
-    password: password
-    url: jdbc:mysql://mysql.servicecomb.io:3306/saga?useSSL=false
-    platform: mysql
-    continue-on-error: false
-  jpa:
-    properties:
-      eclipselink:
-        ddl-generation: none
+#---
+#spring:
+#  profiles: prd
+#  jpa:
+#    properties:
+#      eclipselink:
+#        ddl-generation: none
+#alpha:
+#  spec:
+#    saga:
+#      db:
+#        datasource:
+#          username: saga
+#          password: password
+#          url: jdbc:postgresql://postgresql.servicecomb.io:5432/saga?useSSL=false
+#          platform: postgresql
+#          continue-on-error: false
+#    tcc:
+#      db:
+#        memory-mode: false
+#        datasource:
+#          username: saga
+#          password: password
+#          url: jdbc:postgresql://postgresql.servicecomb.io:5432/saga?useSSL=false
+#          platform: postgresql
+#          continue-on-error: false
+#---
 
----
-spring:
-  profiles: cluster
-
-alpha:
-  feature:
-    akka:
-      enabled: true
-      channel:
-        type: kafka
-
-akkaConfig:
-  akka:
-    actor:
-      provider: cluster
-    persistence:
-      at-least-once-delivery:
-        redeliver-interval: 10s
-        redelivery-burst-limit: 2000
-      journal:
-        plugin: akka-persistence-redis.journal
-      snapshot-store:
-        plugin: akka-persistence-redis.snapshot
-    sharding:
-      state-store-mode: persistence
-    kafka:
-      consumer:
-        poll-interval: 50ms
-        stop-timeout: 30s
-        close-timeout: 20s
-        commit-timeout: 15s
-        commit-time-warning: 5s
-        commit-refresh-interval: infinite
-        use-dispatcher: "akka.kafka.saga-kafka"
-        kafka-clients.enable.auto.commit: false
-        wait-close-partition: 500ms
-        position-timeout: 10s
-        offset-for-times-timeout: 10s
-        metadata-request-timeout: 10s
-        eos-draining-check-interval: 30ms
-        partition-handler-warning: 5s
-        connection-checker.enable: false
-        connection-checker.max-retries: 3
-        connection-checker.check-interval: 15s
-        connection-checker.backoff-factor: 2.0
-      saga-kafka:
-        type: "Dispatcher"
-        executor: "thread-pool-executor"
-        thread-pool-executor:
-          fixed-pool-size: 20
-
-
-akka-persistence-redis:
-  redis:
-    mode: "simple"
-    host: "127.0.0.1"
-    port: 6379
-    database: 0
+#---
+#spring:
+#  profiles: cluster
+#
+#alpha:
+#  feature:
+#    akka:
+#      enabled: true
+#      channel:
+#        type: kafka
+#
+#akkaConfig:
+#  akka:
+#    actor:
+#      provider: cluster
+#    persistence:
+#      at-least-once-delivery:
+#        redeliver-interval: 10s
+#        redelivery-burst-limit: 2000
+#      journal:
+#        plugin: akka-persistence-redis.journal
+#      snapshot-store:
+#        plugin: akka-persistence-redis.snapshot
+#    sharding:
+#      state-store-mode: persistence
+#    kafka:
+#      consumer:
+#        poll-interval: 50ms
+#        stop-timeout: 30s
+#        close-timeout: 20s
+#        commit-timeout: 15s
+#        commit-time-warning: 5s
+#        commit-refresh-interval: infinite
+#        use-dispatcher: "akka.kafka.saga-kafka"
+#        kafka-clients.enable.auto.commit: false
+#        wait-close-partition: 500ms
+#        position-timeout: 10s
+#        offset-for-times-timeout: 10s
+#        metadata-request-timeout: 10s
+#        eos-draining-check-interval: 30ms
+#        partition-handler-warning: 5s
+#        connection-checker.enable: false
+#        connection-checker.max-retries: 3
+#        connection-checker.check-interval: 15s
+#        connection-checker.backoff-factor: 2.0
+#      saga-kafka:
+#        type: "Dispatcher"
+#        executor: "thread-pool-executor"
+#        thread-pool-executor:
+#          fixed-pool-size: 20
+#
+#
+#akka-persistence-redis:
+#  redis:
+#    mode: "simple"
+#    host: "127.0.0.1"
+#    port: 6379
+#    database: 0

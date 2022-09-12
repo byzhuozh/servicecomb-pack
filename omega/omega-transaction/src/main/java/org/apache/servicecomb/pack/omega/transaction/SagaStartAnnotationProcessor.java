@@ -18,46 +18,49 @@
 package org.apache.servicecomb.pack.omega.transaction;
 
 import javax.transaction.TransactionalException;
+
 import org.apache.servicecomb.pack.omega.context.OmegaContext;
 
 public class SagaStartAnnotationProcessor {
 
-  private final OmegaContext omegaContext;
-  private final SagaMessageSender sender;
+    private final OmegaContext omegaContext;
+    private final SagaMessageSender sender;
 
-  public SagaStartAnnotationProcessor(OmegaContext omegaContext, SagaMessageSender sender) {
-    this.omegaContext = omegaContext;
-    this.sender = sender;
-  }
-
-  public AlphaResponse preIntercept(int timeout) {
-    try {
-      return sender
-          .send(new SagaStartedEvent(omegaContext.globalTxId(), omegaContext.localTxId(), timeout));
-    } catch (OmegaException e) {
-      throw new TransactionalException(e.getMessage(), e.getCause());
+    public SagaStartAnnotationProcessor(OmegaContext omegaContext, SagaMessageSender sender) {
+        this.omegaContext = omegaContext;
+        this.sender = sender;
     }
-  }
 
-  public void postIntercept(String parentTxId) {
-    AlphaResponse response = sender
-        .send(new SagaEndedEvent(omegaContext.globalTxId(), omegaContext.localTxId()));
-    //TODO we may know if the transaction is aborted from fsm alpha backend
-    if (response.aborted()) {
-      throw new OmegaException("transaction " + parentTxId + " is aborted");
+    public AlphaResponse preIntercept(int timeout) {
+        try {
+            return sender
+                    .send(new SagaStartedEvent(omegaContext.globalTxId(), omegaContext.localTxId(), timeout));
+        } catch (OmegaException e) {
+            throw new TransactionalException(e.getMessage(), e.getCause());
+        }
     }
-  }
 
-  public void onError(String compensationMethod, Throwable throwable) {
-    String globalTxId = omegaContext.globalTxId();
-    if(omegaContext.getAlphaMetas().isAkkaEnabled()){
-      sender.send(
-          new SagaAbortedEvent(globalTxId, omegaContext.localTxId(), null, compensationMethod,
-              throwable));
-    }else{
-      sender.send(
-          new TxAbortedEvent(globalTxId, omegaContext.localTxId(), null, compensationMethod,
-              throwable));
+    public void postIntercept(String parentTxId) {
+        AlphaResponse response = sender
+                .send(new SagaEndedEvent(omegaContext.globalTxId(), omegaContext.localTxId()));
+        //TODO we may know if the transaction is aborted from fsm alpha backend
+        if (response.aborted()) {
+            throw new OmegaException("transaction " + parentTxId + " is aborted");
+        }
     }
-  }
+
+    public void onError(String compensationMethod, Throwable throwable) {
+        String globalTxId = omegaContext.globalTxId();
+        if (omegaContext.getAlphaMetas().isAkkaEnabled()) {
+            //上报 SagaAbortedEvent 事件
+            sender.send(
+                    new SagaAbortedEvent(globalTxId, omegaContext.localTxId(), null, compensationMethod,
+                            throwable));
+        } else {
+            //上报 TxAbortedEvent 事件
+            sender.send(
+                    new TxAbortedEvent(globalTxId, omegaContext.localTxId(), null, compensationMethod,
+                            throwable));
+        }
+    }
 }

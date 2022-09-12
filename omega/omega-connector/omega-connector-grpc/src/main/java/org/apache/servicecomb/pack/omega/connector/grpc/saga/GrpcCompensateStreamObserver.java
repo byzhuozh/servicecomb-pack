@@ -30,30 +30,30 @@ import org.slf4j.LoggerFactory;
 
 class GrpcCompensateStreamObserver extends ReconnectStreamObserver<GrpcCompensateCommand> {
 
-  private static final Logger LOG = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
+    private static final Logger LOG = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
-  public GrpcCompensateStreamObserver(LoadBalanceContext loadContext,
-      MessageSender messageSender,
-      MessageHandler messageHandler, MessageDeserializer deserializer) {
-    super(loadContext, messageSender);
-    this.messageHandler = messageHandler;
-    this.deserializer = deserializer;
-  }
+    public GrpcCompensateStreamObserver(LoadBalanceContext loadContext,
+                                        MessageSender messageSender,
+                                        MessageHandler messageHandler, MessageDeserializer deserializer) {
+        super(loadContext, messageSender);
+        this.messageHandler = messageHandler;
+        this.deserializer = deserializer;
+    }
 
-  private final MessageHandler messageHandler;
-  private final MessageDeserializer deserializer;
+    private final MessageHandler messageHandler;
+    private final MessageDeserializer deserializer;
 
 
-  @Override
-  public void onNext(GrpcCompensateCommand command) {
-    LOG.info("Received compensate command, global tx id: {}, local tx id: {}, compensation method: {}",
-        command.getGlobalTxId(), command.getLocalTxId(), command.getCompensationMethod());
-
-    messageHandler.onReceive(
-        command.getGlobalTxId(),
-        command.getLocalTxId(),
-        command.getParentTxId().isEmpty() ? null : command.getParentTxId(),
-        command.getCompensationMethod(),
-        deserializer.deserialize(command.getPayloads().toByteArray()));
-  }
+    @Override
+    public void onNext(GrpcCompensateCommand command) {
+        LOG.info("Received compensate command, global tx id: {}, local tx id: {}, compensation method: {}",
+                command.getGlobalTxId(), command.getLocalTxId(), command.getCompensationMethod());
+        //补偿消息处理
+        messageHandler.onReceive(
+                command.getGlobalTxId(),
+                command.getLocalTxId(),
+                command.getParentTxId().isEmpty() ? null : command.getParentTxId(),
+                command.getCompensationMethod(),
+                deserializer.deserialize(command.getPayloads().toByteArray()));
+    }
 }

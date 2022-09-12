@@ -40,62 +40,65 @@ import org.springframework.context.annotation.EnableAspectJAutoProxy;
 @EnableAspectJAutoProxy
 public class TransactionAspectConfig {
 
-  @Bean
-  @ConditionalOnExpression("'${omega.spec.names}'.contains('saga')")
-  MessageHandler messageHandler(SagaMessageSender sender,
-      @Qualifier("compensationContext") CallbackContext context, OmegaContext omegaContext) {
-    return new CompensationMessageHandler(sender, context);
-  }
+    @Bean
+    @ConditionalOnExpression("'${omega.spec.names}'.contains('saga')")
+    MessageHandler messageHandler(SagaMessageSender sender,
+                                  @Qualifier("compensationContext") CallbackContext context, OmegaContext omegaContext) {
+        //补偿消息处理器
+        return new CompensationMessageHandler(sender, context);
+    }
 
-  @Bean
-  @ConditionalOnExpression("'${omega.spec.names}'.contains('saga')")
-  SagaStartAspect sagaStartAspect(SagaMessageSender sender, OmegaContext context) {
-    return new SagaStartAspect(sender, context);
-  }
+    @Bean
+    @ConditionalOnExpression("'${omega.spec.names}'.contains('saga')")
+    SagaStartAspect sagaStartAspect(SagaMessageSender sender, OmegaContext context) {
+        return new SagaStartAspect(sender, context);
+    }
 
-  @Bean
-  @ConditionalOnExpression("'${omega.spec.names}'.contains('saga')")
-  TransactionAspect transactionAspect(SagaMessageSender sender, OmegaContext context) {
-    return new TransactionAspect(sender, context);
-  }
+    @Bean
+    @ConditionalOnExpression("'${omega.spec.names}'.contains('saga')")
+    TransactionAspect transactionAspect(SagaMessageSender sender, OmegaContext context) {
+        return new TransactionAspect(sender, context);
+    }
 
-  @ConditionalOnExpression("'${omega.spec.names}'.contains('saga')")
-  @Bean
-  CompensableAnnotationProcessor compensableAnnotationProcessor(OmegaContext omegaContext,
-      @Qualifier("compensationContext") CallbackContext compensationContext) {
-    return new CompensableAnnotationProcessor(omegaContext, compensationContext);
-  }
+    @ConditionalOnExpression("'${omega.spec.names}'.contains('saga')")
+    @Bean
+    CompensableAnnotationProcessor compensableAnnotationProcessor(OmegaContext omegaContext,
+                                                                  @Qualifier("compensationContext") CallbackContext compensationContext) {
+        //扫描含有补偿注解 Compensable 的类的方法，然后缓存到 CallbackContext.contexts
+        //主要用作-补偿回调的时候的反射调用
+        return new CompensableAnnotationProcessor(omegaContext, compensationContext);
+    }
 
-  @Bean
-  @ConditionalOnExpression("'${omega.spec.names}'.contains('tcc')")
-  TccMessageHandler coordinateMessageHandler(
-      TccMessageSender tccMessageSender,
-      @Qualifier("coordinateContext") CallbackContext coordinateContext,
-      OmegaContext omegaContext,
-      ParametersContext parametersContext) {
-    return new CoordinateMessageHandler(tccMessageSender, coordinateContext, omegaContext, parametersContext);
-  }
+    @Bean
+    @ConditionalOnExpression("'${omega.spec.names}'.contains('tcc')")
+    TccMessageHandler coordinateMessageHandler(
+            TccMessageSender tccMessageSender,
+            @Qualifier("coordinateContext") CallbackContext coordinateContext,
+            OmegaContext omegaContext,
+            ParametersContext parametersContext) {
+        return new CoordinateMessageHandler(tccMessageSender, coordinateContext, omegaContext, parametersContext);
+    }
 
-  @Bean
-  @ConditionalOnExpression("'${omega.spec.names}'.contains('tcc')")
-  TccStartAspect tccStartAspect(
-      TccMessageSender tccMessageSender,
-      OmegaContext context) {
-    return new TccStartAspect(tccMessageSender, context);
-  }
+    @Bean
+    @ConditionalOnExpression("'${omega.spec.names}'.contains('tcc')")
+    TccStartAspect tccStartAspect(
+            TccMessageSender tccMessageSender,
+            OmegaContext context) {
+        return new TccStartAspect(tccMessageSender, context);
+    }
 
-  @Bean
-  @ConditionalOnExpression("'${omega.spec.names}'.contains('tcc')")
-  TccParticipatorAspect tccParticipatorAspect(
-      TccMessageSender tccMessageSender,
-      OmegaContext context, ParametersContext parametersContext) {
-    return new TccParticipatorAspect(tccMessageSender, context, parametersContext);
-  }
+    @Bean
+    @ConditionalOnExpression("'${omega.spec.names}'.contains('tcc')")
+    TccParticipatorAspect tccParticipatorAspect(
+            TccMessageSender tccMessageSender,
+            OmegaContext context, ParametersContext parametersContext) {
+        return new TccParticipatorAspect(tccMessageSender, context, parametersContext);
+    }
 
-  @Bean
-  @ConditionalOnExpression("'${omega.spec.names}'.contains('tcc')")
-  ParticipateAnnotationProcessor participateAnnotationProcessor(OmegaContext omegaContext,
-      @Qualifier("coordinateContext") CallbackContext coordinateContext) {
-    return new ParticipateAnnotationProcessor(omegaContext, coordinateContext);
-  }
+    @Bean
+    @ConditionalOnExpression("'${omega.spec.names}'.contains('tcc')")
+    ParticipateAnnotationProcessor participateAnnotationProcessor(OmegaContext omegaContext,
+                                                                  @Qualifier("coordinateContext") CallbackContext coordinateContext) {
+        return new ParticipateAnnotationProcessor(omegaContext, coordinateContext);
+    }
 }

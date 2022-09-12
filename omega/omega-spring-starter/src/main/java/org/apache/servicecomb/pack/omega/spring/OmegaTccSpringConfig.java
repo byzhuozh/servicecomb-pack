@@ -18,7 +18,9 @@
 package org.apache.servicecomb.pack.omega.spring;
 
 import com.google.common.collect.ImmutableList;
+
 import java.lang.invoke.MethodHandles;
+
 import org.apache.servicecomb.pack.common.AlphaMetaKeys;
 import org.apache.servicecomb.pack.contract.grpc.ServerMeta;
 import org.apache.servicecomb.pack.omega.connector.grpc.AlphaClusterConfig;
@@ -58,48 +60,48 @@ import org.springframework.context.annotation.Lazy;
 @ConditionalOnExpression("'${omega.spec.names}'.contains('tcc')")
 class OmegaTccSpringConfig {
 
-  private static final Logger LOG = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
+    private static final Logger LOG = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
-  public OmegaTccSpringConfig() {
-    LOG.info("Omega Specification TCC");
-  }
+    public OmegaTccSpringConfig() {
+        LOG.info("Omega Specification TCC");
+    }
 
-  @Bean
-  ParametersContext parametersContext() {
-    return new DefaultParametersContext();
-  }
+    @Bean
+    ParametersContext parametersContext() {
+        return new DefaultParametersContext();
+    }
 
-  @Bean(name = {"coordinateContext"})
-  CallbackContext coordinateContext(OmegaContext omegaContext) {
-    return new CallbackContext(omegaContext, null);
-  }
+    @Bean(name = {"coordinateContext"})
+    CallbackContext coordinateContext(OmegaContext omegaContext) {
+        return new CallbackContext(omegaContext, null);
+    }
 
-  @Bean(name = "tccLoadContext")
-  LoadBalanceContext loadBalanceSenderContext(
-      AlphaClusterConfig alphaClusterConfig,
-      ServiceConfig serviceConfig,
-      @Value("${omega.connection.reconnectDelay:3000}") int reconnectDelay,
-      @Value("${omega.connection.sending.timeout:8}") int timeoutSeconds) {
-    LoadBalanceContext loadBalanceSenderContext = new LoadBalanceContextBuilder(
-        TransactionType.TCC,
-        alphaClusterConfig,
-        serviceConfig,
-        reconnectDelay,
-        timeoutSeconds).build();
-    return loadBalanceSenderContext;
-  }
+    @Bean(name = "tccLoadContext")
+    LoadBalanceContext loadBalanceSenderContext(
+            AlphaClusterConfig alphaClusterConfig,
+            ServiceConfig serviceConfig,
+            @Value("${omega.connection.reconnectDelay:3000}") int reconnectDelay,
+            @Value("${omega.connection.sending.timeout:8}") int timeoutSeconds) {
+        LoadBalanceContext loadBalanceSenderContext = new LoadBalanceContextBuilder(
+                TransactionType.TCC,
+                alphaClusterConfig,
+                serviceConfig,
+                reconnectDelay,
+                timeoutSeconds).build();
+        return loadBalanceSenderContext;
+    }
 
-  @Bean
-  TccMessageSender tccLoadBalanceSender(@Qualifier("tccLoadContext") LoadBalanceContext loadBalanceSenderContext) {
-    final TccMessageSender tccMessageSender = new TccLoadBalanceSender(loadBalanceSenderContext, new FastestSender());
-    tccMessageSender.onConnected();
-    Runtime.getRuntime().addShutdownHook(new Thread(new Runnable() {
-      @Override
-      public void run() {
-        tccMessageSender.onDisconnected();
-        tccMessageSender.close();
-      }
-    }));
-    return tccMessageSender;
-  }
+    @Bean
+    TccMessageSender tccLoadBalanceSender(@Qualifier("tccLoadContext") LoadBalanceContext loadBalanceSenderContext) {
+        final TccMessageSender tccMessageSender = new TccLoadBalanceSender(loadBalanceSenderContext, new FastestSender());
+        tccMessageSender.onConnected();
+        Runtime.getRuntime().addShutdownHook(new Thread(new Runnable() {
+            @Override
+            public void run() {
+                tccMessageSender.onDisconnected();
+                tccMessageSender.close();
+            }
+        }));
+        return tccMessageSender;
+    }
 }

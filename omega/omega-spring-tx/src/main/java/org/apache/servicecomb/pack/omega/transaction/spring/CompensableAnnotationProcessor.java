@@ -25,34 +25,34 @@ import org.springframework.util.ReflectionUtils;
 
 class CompensableAnnotationProcessor implements BeanPostProcessor {
 
-  private final OmegaContext omegaContext;
+    private final OmegaContext omegaContext;
 
-  private final CallbackContext compensationContext;
+    private final CallbackContext compensationContext;
 
-  CompensableAnnotationProcessor(OmegaContext omegaContext, CallbackContext compensationContext) {
-    this.omegaContext = omegaContext;
-    this.compensationContext = compensationContext;
-  }
+    CompensableAnnotationProcessor(OmegaContext omegaContext, CallbackContext compensationContext) {
+        this.omegaContext = omegaContext;
+        this.compensationContext = compensationContext;
+    }
 
-  @Override
-  public Object postProcessBeforeInitialization(Object bean, String beanName) throws BeansException {
-    return bean;
-  }
+    @Override
+    public Object postProcessBeforeInitialization(Object bean, String beanName) throws BeansException {
+        return bean;
+    }
 
-  @Override
-  public Object postProcessAfterInitialization(Object bean, String beanName) throws BeansException {
-    checkMethod(bean);
-    checkFields(bean);
-    return bean;
-  }
+    @Override
+    public Object postProcessAfterInitialization(Object bean, String beanName) throws BeansException {
+        checkMethod(bean);
+        checkFields(bean);
+        return bean;
+    }
 
-  private void checkMethod(Object bean) {
-    ReflectionUtils.doWithMethods(
-        bean.getClass(),
-        new CompensableMethodCheckingCallback(bean, compensationContext));
-  }
+    private void checkMethod(Object bean) {
+        ReflectionUtils.doWithMethods(
+                bean.getClass(),
+                new CompensableMethodCheckingCallback(bean, compensationContext));
+    }
 
-  private void checkFields(Object bean) {
-    ReflectionUtils.doWithFields(bean.getClass(), new ExecutorFieldCallback(bean, omegaContext));
-  }
+    private void checkFields(Object bean) {
+        ReflectionUtils.doWithFields(bean.getClass(), new ExecutorFieldCallback(bean, omegaContext));
+    }
 }

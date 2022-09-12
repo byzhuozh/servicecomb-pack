@@ -30,24 +30,25 @@ import org.apache.servicecomb.pack.omega.transaction.TxEvent;
 
 public class SagaLoadBalanceSender extends LoadBalanceSenderAdapter implements SagaMessageSender {
 
-  public SagaLoadBalanceSender(LoadBalanceContext loadContext,
-      MessageSenderPicker senderPicker) {
-    super(loadContext, senderPicker);
-  }
+    public SagaLoadBalanceSender(LoadBalanceContext loadContext,
+                                 MessageSenderPicker senderPicker) {
+        super(loadContext, senderPicker);
+    }
 
-  @Override
-  public AlphaResponse send(TxEvent event) {
-    do {
-      final SagaMessageSender messageSender = pickMessageSender();
-      Optional<AlphaResponse> response = doGrpcSend(messageSender, event, new SenderExecutor<TxEvent>() {
-        @Override
-        public AlphaResponse apply(TxEvent event) {
-          return messageSender.send(event);
-        }
-      });
-      if (response.isPresent()) return response.get();
-    } while (!Thread.currentThread().isInterrupted());
+    @Override
+    public AlphaResponse send(TxEvent event) {
+        do {
+            final SagaMessageSender messageSender = pickMessageSender();
+            Optional<AlphaResponse> response = doGrpcSend(messageSender, event, new SenderExecutor<TxEvent>() {
+                @Override
+                public AlphaResponse apply(TxEvent event) {
+                    return messageSender.send(event);
+                }
+            });
+            if (response.isPresent())
+                return response.get();
+        } while (!Thread.currentThread().isInterrupted());
 
-    throw new OmegaException("Failed to send event " + event + " due to interruption");
-  }
+        throw new OmegaException("Failed to send event " + event + " due to interruption");
+    }
 }

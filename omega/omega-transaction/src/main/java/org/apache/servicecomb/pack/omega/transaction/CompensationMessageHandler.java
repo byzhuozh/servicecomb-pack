@@ -18,21 +18,23 @@
 package org.apache.servicecomb.pack.omega.transaction;
 
 public class CompensationMessageHandler implements MessageHandler {
-  private final SagaMessageSender sender;
+    private final SagaMessageSender sender;
 
-  private final CallbackContext context;
+    private final CallbackContext context;
 
-  public CompensationMessageHandler(SagaMessageSender sender, CallbackContext context) {
-    this.sender = sender;
-    this.context = context;
-  }
-
-  @Override
-  public void onReceive(String globalTxId, String localTxId, String parentTxId, String compensationMethod,
-      Object... payloads) {
-    context.apply(globalTxId, localTxId, parentTxId, compensationMethod, payloads);
-    if (!context.getOmegaContext().getAlphaMetas().isAkkaEnabled()) {
-      sender.send(new TxCompensatedEvent(globalTxId, localTxId, parentTxId, compensationMethod));
+    public CompensationMessageHandler(SagaMessageSender sender, CallbackContext context) {
+        this.sender = sender;
+        this.context = context;
     }
-  }
+
+    @Override
+    public void onReceive(String globalTxId, String localTxId, String parentTxId, String compensationMethod,
+                          Object... payloads) {
+        // 执行分支事务的撤销操作
+        context.apply(globalTxId, localTxId, parentTxId, compensationMethod, payloads);
+
+        if (!context.getOmegaContext().getAlphaMetas().isAkkaEnabled()) {
+            sender.send(new TxCompensatedEvent(globalTxId, localTxId, parentTxId, compensationMethod));
+        }
+    }
 }

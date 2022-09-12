@@ -18,15 +18,15 @@
 package org.apache.servicecomb.pack.omega.transaction;
 
 public class RecoveryPolicyFactory {
-  private static final RecoveryPolicy DEFAULT_RECOVERY = new DefaultRecovery();
+    private static final RecoveryPolicy DEFAULT_RECOVERY = new DefaultRecovery();
 
-  private static final RecoveryPolicy FORWARD_RECOVERY = new ForwardRecovery();
+    private static final RecoveryPolicy FORWARD_RECOVERY = new ForwardRecovery();
 
-  /**
-   * If retries == 0, use the default recovery to execute only once.
-   * If retries > 0, it will use the forward recovery and retry the given times at most.
-   */
-  static RecoveryPolicy getRecoveryPolicy(int forwardRetries) {
-    return forwardRetries > 0 ? FORWARD_RECOVERY : DEFAULT_RECOVERY;
-  }
+    /**
+     * If retries == 0, use the default recovery to execute only once. If retries > 0, it will use the forward recovery
+     * and retry the given times at most.
+     */
+    static RecoveryPolicy getRecoveryPolicy(int forwardRetries) {
+        return forwardRetries > 0 ? FORWARD_RECOVERY : DEFAULT_RECOVERY;
+    }
 }

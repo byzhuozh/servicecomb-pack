@@ -26,38 +26,40 @@ import java.util.concurrent.ScheduledExecutorService;
 
 public class PendingTaskRunner {
 
-  private final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
+    private final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
 
-  private final BlockingQueue<Runnable> pendingTasks = new LinkedBlockingQueue<>();
+    private final BlockingQueue<Runnable> pendingTasks = new LinkedBlockingQueue<>();
 
-  private final int reconnectDelay;
+    //默认 3000
+    private final int reconnectDelay;
 
-  public PendingTaskRunner(int reconnectDelay) {
-    this.reconnectDelay = reconnectDelay;
-  }
+    public PendingTaskRunner(int reconnectDelay) {
+        this.reconnectDelay = reconnectDelay;
+    }
 
-  public void start() {
-    scheduler.scheduleWithFixedDelay(new Runnable() {
-      @Override
-      public void run() {
-        try {
-          pendingTasks.take().run();
-        } catch (InterruptedException e) {
-          Thread.currentThread().interrupt();
-        }
-      }
-    }, 0, reconnectDelay, MILLISECONDS);
-  }
+    public void start() {
+        //每个 3s 轮询一次队列，触发队列中的任务执行
+        scheduler.scheduleWithFixedDelay(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    pendingTasks.take().run();
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
+            }
+        }, 0, reconnectDelay, MILLISECONDS);
+    }
 
-  public void shutdown() {
-    scheduler.shutdown();
-  }
+    public void shutdown() {
+        scheduler.shutdown();
+    }
 
-  public BlockingQueue<Runnable> getPendingTasks() {
-    return pendingTasks;
-  }
+    public BlockingQueue<Runnable> getPendingTasks() {
+        return pendingTasks;
+    }
 
-  public int getReconnectDelay() {
-    return reconnectDelay;
-  }
+    public int getReconnectDelay() {
+        return reconnectDelay;
+    }
 }

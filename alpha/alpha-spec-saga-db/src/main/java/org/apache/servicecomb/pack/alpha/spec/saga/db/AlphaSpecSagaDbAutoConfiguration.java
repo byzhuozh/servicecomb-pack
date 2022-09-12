@@ -20,6 +20,7 @@ package org.apache.servicecomb.pack.alpha.spec.saga.db;
 import java.lang.invoke.MethodHandles;
 import java.util.Map;
 import java.util.concurrent.ScheduledExecutorService;
+
 import org.apache.servicecomb.pack.alpha.core.CommandRepository;
 import org.apache.servicecomb.pack.alpha.core.EventScanner;
 import org.apache.servicecomb.pack.alpha.core.NodeStatus;
@@ -54,95 +55,96 @@ import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
 
 @Configuration
 @ImportAutoConfiguration({SpecSagaDbProperties.class, EclipseLinkJpaConfiguration.class,
-    LockProviderJdbcConfiguration.class})
+        LockProviderJdbcConfiguration.class})
 @EnableJpaRepositories(basePackages = "org.apache.servicecomb.pack.alpha.spec.saga.db")
 @ConditionalOnExpression("'${alpha.spec.names}'.contains('saga-db')")
 public class AlphaSpecSagaDbAutoConfiguration {
 
-  private static final Logger LOG = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
+    private static final Logger LOG = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
-  public AlphaSpecSagaDbAutoConfiguration() {
-    LOG.info("Alpha Specification Saga DB");
-  }
-
-  @Bean
-  @Primary
-  public DataSourceProperties dataSourceProperties(SpecSagaDbProperties specSagaDbProperties) {
-    return specSagaDbProperties.getDatasource();
-  }
-
-  @Bean
-  CommandRepository springCommandRepository(TxEventEnvelopeRepository eventRepo,
-      CommandEntityRepository commandRepository) {
-    return new SpringCommandRepository(eventRepo, commandRepository);
-  }
-
-  @Bean
-  TxTimeoutRepository springTxTimeoutRepository(TxTimeoutEntityRepository timeoutRepo) {
-    return new SpringTxTimeoutRepository(timeoutRepo);
-  }
-
-  @Bean
-  TxEventRepository springTxEventRepository(TxEventEnvelopeRepository eventRepo) {
-    return new SpringTxEventRepository(eventRepo);
-  }
-
-  @Bean
-  TxConsistentService txConsistentService(
-      @Value("${alpha.event.pollingInterval:500}") int eventPollingInterval,
-      @Value("${alpha.event.scanner.enabled:true}") boolean eventScannerEnabled,
-      ScheduledExecutorService scheduler,
-      TxEventRepository eventRepository,
-      CommandRepository commandRepository,
-      TxTimeoutRepository timeoutRepository,
-      OmegaCallback omegaCallback,
-      NodeStatus nodeStatus) {
-    if (eventScannerEnabled) {
-      new EventScanner(scheduler,
-          eventRepository, commandRepository, timeoutRepository,
-          omegaCallback, eventPollingInterval, nodeStatus).run();
-      LOG.info("Starting the EventScanner.");
+    public AlphaSpecSagaDbAutoConfiguration() {
+        LOG.info("Alpha Specification Saga DB");
     }
-    TxConsistentService consistentService = new TxConsistentService(eventRepository);
-    return consistentService;
-  }
 
-  @Bean
-  GrpcTxEventEndpointImpl grpcTxEventEndpoint(TxConsistentService txConsistentService,
-      Map<String, Map<String, OmegaCallback>> omegaCallbacks) {
-    ServerMeta serverMeta = ServerMeta.newBuilder()
-        .putMeta(AlphaMetaKeys.AkkaEnabled.name(), String.valueOf(false)).build();
-    return new GrpcTxEventEndpointImpl(txConsistentService, omegaCallbacks, serverMeta);
-  }
+    @Bean
+    @Primary
+    public DataSourceProperties dataSourceProperties(SpecSagaDbProperties specSagaDbProperties) {
+        return specSagaDbProperties.getDatasource();
+    }
 
-  @Bean
-  ClusterLockService clusterLockService() {
-    return new ClusterLockService();
-  }
+    @Bean
+    CommandRepository springCommandRepository(TxEventEnvelopeRepository eventRepo,
+                                              CommandEntityRepository commandRepository) {
+        return new SpringCommandRepository(eventRepo, commandRepository);
+    }
 
-  @Bean
-  public MetricsService metricsService() {
-    return new MetricsService();
-  }
+    @Bean
+    TxTimeoutRepository springTxTimeoutRepository(TxTimeoutEntityRepository timeoutRepo) {
+        return new SpringTxTimeoutRepository(timeoutRepo);
+    }
 
-  @Bean
-  AlphaMetricsEndpoint alphaMetricsEndpoint(){
-    return new AlphaMetricsEndpointImpl();
-  }
+    @Bean
+    TxEventRepository springTxEventRepository(TxEventEnvelopeRepository eventRepo) {
+        return new SpringTxEventRepository(eventRepo);
+    }
 
-  @Bean
-  SagaDbAPIv1Controller apIv1Controller(){
-    return new SagaDbAPIv1Controller();
-  }
+    @Bean
+    TxConsistentService txConsistentService(
+            @Value("${alpha.event.pollingInterval:500}") int eventPollingInterval,
+            @Value("${alpha.event.scanner.enabled:true}") boolean eventScannerEnabled,
+            ScheduledExecutorService scheduler,
+            TxEventRepository eventRepository,
+            CommandRepository commandRepository,
+            TxTimeoutRepository timeoutRepository,
+            OmegaCallback omegaCallback,
+            NodeStatus nodeStatus) {
+        if (eventScannerEnabled) {
+            //启动事件扫描
+            new EventScanner(scheduler,
+                    eventRepository, commandRepository, timeoutRepository,
+                    omegaCallback, eventPollingInterval, nodeStatus).run();
+            LOG.info("Starting the EventScanner.");
+        }
+        TxConsistentService consistentService = new TxConsistentService(eventRepository);
+        return consistentService;
+    }
 
-  @Bean
-  APIv1 apIv1(){
-    return new SagaDbAPIv1Impl();
-  }
+    @Bean
+    GrpcTxEventEndpointImpl grpcTxEventEndpoint(TxConsistentService txConsistentService,
+                                                Map<String, Map<String, OmegaCallback>> omegaCallbacks) {  // AlphaConfig.omegaCallbacks 中定义的 Bean
+        ServerMeta serverMeta = ServerMeta.newBuilder()
+                .putMeta(AlphaMetaKeys.AkkaEnabled.name(), String.valueOf(false)).build();
+        return new GrpcTxEventEndpointImpl(txConsistentService, omegaCallbacks, serverMeta);
+    }
 
-  @Bean
-  @Profile("test")
-  AlphaEventController alphaEventController(TxEventEnvelopeRepository eventRepository){
-    return new AlphaEventController(eventRepository);
-  }
+    @Bean
+    ClusterLockService clusterLockService() {
+        return new ClusterLockService();
+    }
+
+    @Bean
+    public MetricsService metricsService() {
+        return new MetricsService();
+    }
+
+    @Bean
+    AlphaMetricsEndpoint alphaMetricsEndpoint() {
+        return new AlphaMetricsEndpointImpl();
+    }
+
+    @Bean
+    SagaDbAPIv1Controller apIv1Controller() {
+        return new SagaDbAPIv1Controller();
+    }
+
+    @Bean
+    APIv1 apIv1() {
+        return new SagaDbAPIv1Impl();
+    }
+
+    @Bean
+    @Profile("test")
+    AlphaEventController alphaEventController(TxEventEnvelopeRepository eventRepository) {
+        return new AlphaEventController(eventRepository);
+    }
 }

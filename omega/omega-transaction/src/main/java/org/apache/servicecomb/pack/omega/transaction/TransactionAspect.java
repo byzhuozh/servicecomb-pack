@@ -35,47 +35,53 @@ import org.springframework.core.annotation.Order;
 @Order(value = 200)
 public class TransactionAspect extends TransactionContextHelper {
 
-  private static final Logger LOG = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
+    private static final Logger LOG = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
-  private final OmegaContext context;
+    private final OmegaContext context;
 
-  private final CompensableInterceptor interceptor;
+    private final CompensableInterceptor interceptor;
 
-  public TransactionAspect(SagaMessageSender sender, OmegaContext context) {
-    this.context = context;
-    this.context.verify();
-    this.interceptor = new CompensableInterceptor(context, sender);
-  }
-
-  @Around("execution(@org.apache.servicecomb.pack.omega.transaction.annotations.Compensable * *(..)) && @annotation(compensable)")
-  Object advise(ProceedingJoinPoint joinPoint, Compensable compensable) throws Throwable {
-    Method method = ((MethodSignature) joinPoint.getSignature()).getMethod();
-    // just check if we need to setup the transaction context information first
-    TransactionContext transactionContext = extractTransactionContext(joinPoint.getArgs());
-    if (transactionContext != null) {
-      populateOmegaContext(context, transactionContext);
+    public TransactionAspect(SagaMessageSender sender, OmegaContext context) {
+        this.context = context;
+        this.context.verify();
+        this.interceptor = new CompensableInterceptor(context, sender);
     }
-    // SCB-1011 Need to check if the globalTxId transaction is null to avoid the message sending failure
-    if (context.globalTxId() == null) {
-      throw new OmegaException("Cannot find the globalTxId from OmegaContext. Please using @SagaStart to start a global transaction.");
-    }
-    String localTxId = context.localTxId();
-    context.newLocalTxId();
-    LOG.debug("Updated context {} for compensable method {} ", context, method.toString());
 
-    int forwardRetries = compensable.forwardRetries();
-    RecoveryPolicy recoveryPolicy = RecoveryPolicyFactory.getRecoveryPolicy(forwardRetries);
-    try {
-      return recoveryPolicy.apply(joinPoint, compensable, interceptor, context, localTxId, forwardRetries);
-    } finally {
-      context.setLocalTxId(localTxId);
-      LOG.debug("Restored context back to {}", context);
-    }
-  }
+    @Around("execution(@org.apache.servicecomb.pack.omega.transaction.annotations.Compensable * *(..)) && @annotation(compensable)")
+    Object advise(ProceedingJoinPoint joinPoint, Compensable compensable) throws Throwable {
+        Method method = ((MethodSignature) joinPoint.getSignature()).getMethod();
 
-  @Override
-  protected Logger getLogger() {
-    return LOG;
-  }
+        // just check if we need to setup the transaction context information first
+        TransactionContext transactionContext = extractTransactionContext(joinPoint.getArgs());
+        if (transactionContext != null) {
+            populateOmegaContext(context, transactionContext);
+        }
+
+        // SCB-1011 Need to check if the globalTxId transaction is null to avoid the message sending failure
+        if (context.globalTxId() == null) {
+            throw new OmegaException("Cannot find the globalTxId from OmegaContext. Please using @SagaStart to start a global transaction.");
+        }
+
+        String localTxId = context.localTxId();
+        // 生成新的分支事务Id
+        context.newLocalTxId();
+        LOG.debug("Updated context {} for compensable method {} ", context, method.toString());
+
+        int forwardRetries = compensable.forwardRetries();
+        // 默认 DefaultRecovery 类型
+        RecoveryPolicy recoveryPolicy = RecoveryPolicyFactory.getRecoveryPolicy(forwardRetries);
+        try {
+            return recoveryPolicy.apply(joinPoint, compensable, interceptor, context, localTxId, forwardRetries);
+        } finally {
+            //本地分支事务重新赋值
+            context.setLocalTxId(localTxId);
+            LOG.debug("Restored context back to {}", context);
+        }
+    }
+
+    @Override
+    protected Logger getLogger() {
+        return LOG;
+    }
 
 }

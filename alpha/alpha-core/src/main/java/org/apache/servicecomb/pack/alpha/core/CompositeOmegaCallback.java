@@ -30,40 +30,44 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 public class CompositeOmegaCallback implements OmegaCallback {
-  private static final Logger LOG = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
-  private final Map<String, Map<String, OmegaCallback>> callbacks;
+    private static final Logger LOG = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
-  public CompositeOmegaCallback(Map<String, Map<String, OmegaCallback>> callbacks) {
-    this.callbacks = callbacks;
-  }
+    //key: 服务名， val={key:实例ID[服务名 + ip + port], val=对应的回调客户端}
+    private final Map<String, Map<String, OmegaCallback>> callbacks;
 
-  @Override
-  public void compensate(TxEvent event) {
-    Map<String, OmegaCallback> serviceCallbacks = callbacks.getOrDefault(event.serviceName(), emptyMap());
-
-    OmegaCallback omegaCallback = serviceCallbacks.get(event.instanceId());
-    if (omegaCallback == null) {
-      LOG.info("Cannot find the service with the instanceId {}, call the other instance.", event.instanceId());
-      // TODO extract an Interface to let user define the serviceCallback instance pick strategy
-      Iterator<OmegaCallback> iterator = new ArrayList<>(serviceCallbacks.values()).iterator();
-      if(iterator.hasNext()) {
-        omegaCallback = iterator.next();
-      }
-    }
-    if(omegaCallback==null){
-      throw new AlphaException("No such omega callback found for service " + event.serviceName());
+    public CompositeOmegaCallback(Map<String, Map<String, OmegaCallback>> callbacks) {
+        this.callbacks = callbacks;
     }
 
-    try {
-      omegaCallback.compensate(event);
-    } catch (CompensateConnectException e) {
-      serviceCallbacks.values().remove(omegaCallback);
-      throw e;
-    } catch (CompensateAckFailedException e) {
-      throw e;
-    } catch (Exception e) {
-      serviceCallbacks.values().remove(omegaCallback);
-      throw e;
+    @Override
+    public void compensate(TxEvent event) {
+        Map<String, OmegaCallback> serviceCallbacks = callbacks.getOrDefault(event.serviceName(), emptyMap());
+
+        OmegaCallback omegaCallback = serviceCallbacks.get(event.instanceId());
+        if (omegaCallback == null) {
+            LOG.info("Cannot find the service with the instanceId {}, call the other instance.", event.instanceId());
+            // TODO extract an Interface to let user define the serviceCallback instance pick strategy
+            //如果根据 instanceId 未匹配到 omega 服务，则允许使用别的实例
+            Iterator<OmegaCallback> iterator = new ArrayList<>(serviceCallbacks.values()).iterator();
+            if (iterator.hasNext()) {
+                omegaCallback = iterator.next();
+            }
+        }
+        if (omegaCallback == null) {
+            throw new AlphaException("No such omega callback found for service " + event.serviceName());
+        }
+
+        try {
+            //补偿触发
+            omegaCallback.compensate(event);
+        } catch (CompensateConnectException e) {
+            serviceCallbacks.values().remove(omegaCallback);
+            throw e;
+        } catch (CompensateAckFailedException e) {
+            throw e;
+        } catch (Exception e) {
+            serviceCallbacks.values().remove(omegaCallback);
+            throw e;
+        }
     }
-  }
 }

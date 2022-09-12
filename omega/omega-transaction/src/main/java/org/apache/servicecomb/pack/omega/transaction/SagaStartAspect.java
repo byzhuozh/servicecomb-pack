@@ -17,6 +17,7 @@
 
 package org.apache.servicecomb.pack.omega.transaction;
 
+import lombok.extern.slf4j.Slf4j;
 import org.apache.servicecomb.pack.omega.context.OmegaContext;
 import org.apache.servicecomb.pack.omega.context.annotations.SagaStart;
 import org.apache.servicecomb.pack.omega.transaction.wrapper.SagaStartAnnotationProcessorTimeoutWrapper;
@@ -26,32 +27,37 @@ import org.aspectj.lang.annotation.Around;
 import org.aspectj.lang.annotation.Aspect;
 import org.springframework.core.annotation.Order;
 
+@Slf4j
 @Aspect
 @Order(value = 100)
 public class SagaStartAspect {
 
-  private final SagaStartAnnotationProcessor sagaStartAnnotationProcessor;
+    private final SagaStartAnnotationProcessor sagaStartAnnotationProcessor;
 
-  private final OmegaContext context;
+    private final OmegaContext context;
 
-  public SagaStartAspect(SagaMessageSender sender, OmegaContext context) {
-    this.context = context;
-    this.sagaStartAnnotationProcessor = new SagaStartAnnotationProcessor(context, sender);
-  }
-
-  @Around("execution(@org.apache.servicecomb.pack.omega.context.annotations.SagaStart * *(..)) && @annotation(sagaStart)")
-  Object advise(ProceedingJoinPoint joinPoint, SagaStart sagaStart) throws Throwable {
-    initializeOmegaContext();
-    if(context.getAlphaMetas().isAkkaEnabled() && sagaStart.timeout()>0){
-      SagaStartAnnotationProcessorTimeoutWrapper wrapper = new SagaStartAnnotationProcessorTimeoutWrapper(this.sagaStartAnnotationProcessor);
-      return wrapper.apply(joinPoint,sagaStart,context);
-    }else{
-      SagaStartAnnotationProcessorWrapper wrapper = new SagaStartAnnotationProcessorWrapper(this.sagaStartAnnotationProcessor);
-      return wrapper.apply(joinPoint,sagaStart,context);
+    public SagaStartAspect(SagaMessageSender sender, OmegaContext context) {
+        this.context = context;
+        this.sagaStartAnnotationProcessor = new SagaStartAnnotationProcessor(context, sender);
     }
-  }
 
-  private void initializeOmegaContext() {
-    context.setLocalTxId(context.newGlobalTxId());
-  }
+    @Around("execution(@org.apache.servicecomb.pack.omega.context.annotations.SagaStart * *(..)) && @annotation(sagaStart)")
+    Object advise(ProceedingJoinPoint joinPoint, SagaStart sagaStart) throws Throwable {
+        //初始化全局事务Id 和 本地事务分支Id
+        initializeOmegaContext();
+//        log.info("初始化全局事务Id={} 和 本地事务分支Id={}", context.globalTxId(), context.localTxId());
+
+        if (context.getAlphaMetas().isAkkaEnabled() && sagaStart.timeout() > 0) {
+            SagaStartAnnotationProcessorTimeoutWrapper wrapper = new SagaStartAnnotationProcessorTimeoutWrapper(this.sagaStartAnnotationProcessor);
+            return wrapper.apply(joinPoint, sagaStart, context);
+        } else {
+            //默认方式
+            SagaStartAnnotationProcessorWrapper wrapper = new SagaStartAnnotationProcessorWrapper(this.sagaStartAnnotationProcessor);
+            return wrapper.apply(joinPoint, sagaStart, context);
+        }
+    }
+
+    private void initializeOmegaContext() {
+        context.setLocalTxId(context.newGlobalTxId());
+    }
 }

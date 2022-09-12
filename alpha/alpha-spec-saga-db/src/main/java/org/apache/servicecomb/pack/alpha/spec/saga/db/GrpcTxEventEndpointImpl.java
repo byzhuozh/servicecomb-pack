@@ -23,10 +23,12 @@ package org.apache.servicecomb.pack.alpha.spec.saga.db;
 import static java.util.Collections.emptyMap;
 
 import io.grpc.stub.StreamObserver;
+
 import java.lang.invoke.MethodHandles;
 import java.util.Date;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+
 import org.apache.servicecomb.pack.alpha.core.OmegaCallback;
 import org.apache.servicecomb.pack.alpha.core.TxConsistentService;
 import org.apache.servicecomb.pack.alpha.core.TxEvent;
@@ -41,82 +43,84 @@ import org.slf4j.LoggerFactory;
 
 class GrpcTxEventEndpointImpl extends TxEventServiceImplBase {
 
-  private static final Logger LOG = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
-  private static final GrpcAck ALLOW = GrpcAck.newBuilder().setAborted(false).build();
-  private static final GrpcAck REJECT = GrpcAck.newBuilder().setAborted(true).build();
+    private static final Logger LOG = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
+    private static final GrpcAck ALLOW = GrpcAck.newBuilder().setAborted(false).build();
+    private static final GrpcAck REJECT = GrpcAck.newBuilder().setAborted(true).build();
 
-  private final TxConsistentService txConsistentService;
+    private final TxConsistentService txConsistentService;
 
-  private final Map<String, Map<String, OmegaCallback>> omegaCallbacks;
-  private final ServerMeta serverMeta;
+    //缓存 omega 客户端， key=服务名，val={key=实例ID, val=omega的回调监听器}
+    private final Map<String, Map<String, OmegaCallback>> omegaCallbacks;
+    private final ServerMeta serverMeta;
 
-  GrpcTxEventEndpointImpl(TxConsistentService txConsistentService,
-      Map<String, Map<String, OmegaCallback>> omegaCallbacks, ServerMeta serverMeta) {
-    this.txConsistentService = txConsistentService;
-    this.omegaCallbacks = omegaCallbacks;
-    this.serverMeta = serverMeta;
-  }
-
-  @Override
-  public StreamObserver<GrpcServiceConfig> onConnected(StreamObserver<GrpcCompensateCommand> responseObserver) {
-    return new StreamObserver<GrpcServiceConfig>() {
-      @Override
-      public void onNext(GrpcServiceConfig grpcServiceConfig) {
-        omegaCallbacks
-            .computeIfAbsent(grpcServiceConfig.getServiceName(), key -> new ConcurrentHashMap<>())
-            .put(grpcServiceConfig.getInstanceId(), new GrpcOmegaCallback(responseObserver));
-      }
-
-      @Override
-      public void onError(Throwable throwable) {
-        LOG.error(throwable.getMessage());
-      }
-
-      @Override
-      public void onCompleted() {
-        LOG.info("Omega client called method onCompleted of GrpcServiceConfig");
-      }
-    };
-  }
-
-  // TODO: 2018/1/5 connect is async and disconnect is sync, meaning callback may not be registered on disconnected
-  @Override
-  public void onDisconnected(GrpcServiceConfig request, StreamObserver<GrpcAck> responseObserver) {
-    OmegaCallback callback = omegaCallbacks.getOrDefault(request.getServiceName(), emptyMap())
-        .remove(request.getInstanceId());
-
-    if (callback != null) {
-      callback.disconnect();
+    GrpcTxEventEndpointImpl(TxConsistentService txConsistentService,
+                            Map<String, Map<String, OmegaCallback>> omegaCallbacks, ServerMeta serverMeta) {
+        this.txConsistentService = txConsistentService;
+        this.omegaCallbacks = omegaCallbacks;
+        this.serverMeta = serverMeta;
     }
 
-    responseObserver.onNext(ALLOW);
-    responseObserver.onCompleted();
-  }
+    @Override
+    public StreamObserver<GrpcServiceConfig> onConnected(StreamObserver<GrpcCompensateCommand> responseObserver) {
+        return new StreamObserver<GrpcServiceConfig>() {
+            @Override
+            public void onNext(GrpcServiceConfig grpcServiceConfig) {
+                omegaCallbacks
+                        .computeIfAbsent(grpcServiceConfig.getServiceName(), key -> new ConcurrentHashMap<>())
+                        .put(grpcServiceConfig.getInstanceId(), new GrpcOmegaCallback(responseObserver));
+            }
 
-  @Override
-  public void onTxEvent(GrpcTxEvent message, StreamObserver<GrpcAck> responseObserver) {
-    boolean ok = txConsistentService.handle(new TxEvent(
-        message.getServiceName(),
-        message.getInstanceId(),
-        new Date(),
-        message.getGlobalTxId(),
-        message.getLocalTxId(),
-        message.getParentTxId().isEmpty() ? null : message.getParentTxId(),
-        message.getType(),
-        message.getCompensationMethod(),
-        message.getTimeout(),
-        message.getRetryMethod(),
-        message.getForwardRetries(),
-        message.getPayloads().toByteArray()
-    ));
+            @Override
+            public void onError(Throwable throwable) {
+                LOG.error(throwable.getMessage());
+            }
 
-    responseObserver.onNext(ok ? ALLOW : REJECT);
-    responseObserver.onCompleted();
-  }
+            @Override
+            public void onCompleted() {
+                LOG.info("Omega client called method onCompleted of GrpcServiceConfig");
+            }
+        };
+    }
 
-  @Override
-  public void onGetServerMeta(GrpcServiceConfig request, StreamObserver<ServerMeta> responseObserver){
-    responseObserver.onNext(this.serverMeta);
-    responseObserver.onCompleted();
-  }
+    // TODO: 2018/1/5 connect is async and disconnect is sync, meaning callback may not be registered on disconnected
+    @Override
+    public void onDisconnected(GrpcServiceConfig request, StreamObserver<GrpcAck> responseObserver) {
+        OmegaCallback callback = omegaCallbacks.getOrDefault(request.getServiceName(), emptyMap())
+                .remove(request.getInstanceId());
+
+        if (callback != null) {
+            callback.disconnect();
+        }
+
+        responseObserver.onNext(ALLOW);
+        responseObserver.onCompleted();
+    }
+
+    @Override
+    public void onTxEvent(GrpcTxEvent message, StreamObserver<GrpcAck> responseObserver) {
+        // 保存 omega 上报的事件
+        boolean ok = txConsistentService.handle(new TxEvent(
+                message.getServiceName(),
+                message.getInstanceId(),
+                new Date(),
+                message.getGlobalTxId(),
+                message.getLocalTxId(),
+                message.getParentTxId().isEmpty() ? null : message.getParentTxId(),
+                message.getType(),
+                message.getCompensationMethod(),
+                message.getTimeout(),
+                message.getRetryMethod(),
+                message.getForwardRetries(),
+                message.getPayloads().toByteArray()
+        ));
+
+        responseObserver.onNext(ok ? ALLOW : REJECT);
+        responseObserver.onCompleted();
+    }
+
+    @Override
+    public void onGetServerMeta(GrpcServiceConfig request, StreamObserver<ServerMeta> responseObserver) {
+        responseObserver.onNext(this.serverMeta);
+        responseObserver.onCompleted();
+    }
 }

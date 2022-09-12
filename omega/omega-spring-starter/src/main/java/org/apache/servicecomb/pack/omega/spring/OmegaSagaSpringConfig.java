@@ -45,43 +45,46 @@ import java.lang.invoke.MethodHandles;
 @ConditionalOnExpression("'${omega.spec.names}'.contains('saga')")
 class OmegaSagaSpringConfig {
 
-  private static final Logger LOG = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
+    private static final Logger LOG = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
-  public OmegaSagaSpringConfig() {
-    LOG.info("Omega Specification Saga");
-  }
+    public OmegaSagaSpringConfig() {
+        LOG.info("Omega Specification Saga");
+    }
 
-  @Bean(name = {"compensationContext"})
-  CallbackContext compensationContext(OmegaContext omegaContext, SagaMessageSender sender) {
-    return new CallbackContext(omegaContext, sender);
-  }
+    @Bean(name = {"compensationContext"})
+    CallbackContext compensationContext(OmegaContext omegaContext, SagaMessageSender sender) {
+        return new CallbackContext(omegaContext, sender);
+    }
 
-  @Bean(name = "sagaLoadContext")
-  LoadBalanceContext sagaLoadBalanceSenderContext(
-      AlphaClusterConfig alphaClusterConfig,
-      ServiceConfig serviceConfig,
-      @Value("${omega.connection.reconnectDelay:3000}") int reconnectDelay,
-      @Value("${omega.connection.sending.timeout:8}") int timeoutSeconds) {
-    LoadBalanceContext loadBalanceSenderContext = new LoadBalanceContextBuilder(
-        TransactionType.SAGA,
-        alphaClusterConfig,
-        serviceConfig,
-        reconnectDelay,
-        timeoutSeconds).build();
-    return loadBalanceSenderContext;
-  }
+    @Bean(name = "sagaLoadContext")
+    LoadBalanceContext sagaLoadBalanceSenderContext(
+            AlphaClusterConfig alphaClusterConfig,
+            ServiceConfig serviceConfig,
+            @Value("${omega.connection.reconnectDelay:3000}") int reconnectDelay,
+            @Value("${omega.connection.sending.timeout:8}") int timeoutSeconds) {
+        LoadBalanceContext loadBalanceSenderContext = new LoadBalanceContextBuilder(
+                TransactionType.SAGA,
+                alphaClusterConfig,
+                serviceConfig,
+                reconnectDelay,
+                timeoutSeconds).build();
+        return loadBalanceSenderContext;
+    }
 
-  @Bean
-  SagaMessageSender sagaLoadBalanceSender(@Qualifier("sagaLoadContext") LoadBalanceContext loadBalanceSenderContext) {
-    final SagaMessageSender sagaMessageSender = new SagaLoadBalanceSender(loadBalanceSenderContext, new FastestSender());
-    sagaMessageSender.onConnected();
-    Runtime.getRuntime().addShutdownHook(new Thread(new Runnable() {
-      @Override
-      public void run() {
-        sagaMessageSender.onDisconnected();
-        sagaMessageSender.close();
-      }
-    }));
-    return sagaMessageSender;
-  }
+    @Bean
+    SagaMessageSender sagaLoadBalanceSender(@Qualifier("sagaLoadContext") LoadBalanceContext loadBalanceSenderContext) {
+
+        final SagaMessageSender sagaMessageSender = new SagaLoadBalanceSender(loadBalanceSenderContext, new FastestSender());
+        //连接 alpha，上报 omega客户端的信息
+        sagaMessageSender.onConnected();
+
+        Runtime.getRuntime().addShutdownHook(new Thread(new Runnable() {
+            @Override
+            public void run() {
+                sagaMessageSender.onDisconnected();
+                sagaMessageSender.close();
+            }
+        }));
+        return sagaMessageSender;
+    }
 }

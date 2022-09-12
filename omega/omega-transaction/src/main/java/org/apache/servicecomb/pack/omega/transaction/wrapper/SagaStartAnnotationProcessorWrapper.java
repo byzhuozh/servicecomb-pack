@@ -19,6 +19,7 @@ package org.apache.servicecomb.pack.omega.transaction.wrapper;
 
 import java.lang.invoke.MethodHandles;
 import java.lang.reflect.Method;
+
 import org.apache.servicecomb.pack.omega.context.OmegaContext;
 import org.apache.servicecomb.pack.omega.context.annotations.SagaStart;
 import org.apache.servicecomb.pack.omega.transaction.OmegaException;
@@ -30,37 +31,42 @@ import org.slf4j.LoggerFactory;
 
 public class SagaStartAnnotationProcessorWrapper {
 
-  private static final Logger LOG = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
-  private final SagaStartAnnotationProcessor sagaStartAnnotationProcessor;
+    private static final Logger LOG = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
+    private final SagaStartAnnotationProcessor sagaStartAnnotationProcessor;
 
-  public SagaStartAnnotationProcessorWrapper(
-      SagaStartAnnotationProcessor sagaStartAnnotationProcessor) {
-    this.sagaStartAnnotationProcessor = sagaStartAnnotationProcessor;
-  }
-
-  public Object apply(ProceedingJoinPoint joinPoint, SagaStart sagaStart, OmegaContext context)
-      throws Throwable {
-    Method method = ((MethodSignature) joinPoint.getSignature()).getMethod();
-    sagaStartAnnotationProcessor.preIntercept(sagaStart.timeout());
-    LOG.debug("Initialized context {} before execution of method {}", context, method.toString());
-    try {
-      Object result = joinPoint.proceed();
-      if (sagaStart.autoClose()) {
-        sagaStartAnnotationProcessor.postIntercept(context.globalTxId());
-        LOG.debug("Transaction with context {} has finished.", context);
-      } else {
-        LOG.debug("Transaction with context {} is not finished in the SagaStarted annotated method.", context);
-      }
-      return result;
-    } catch (Throwable throwable) {
-      // We don't need to handle the OmegaException here
-      if (!(throwable instanceof OmegaException)) {
-        sagaStartAnnotationProcessor.onError(method.toString(), throwable);
-        LOG.error("Transaction {} failed.", context.globalTxId());
-      }
-      throw throwable;
-    } finally {
-      context.clear();
+    public SagaStartAnnotationProcessorWrapper(
+            SagaStartAnnotationProcessor sagaStartAnnotationProcessor) {
+        this.sagaStartAnnotationProcessor = sagaStartAnnotationProcessor;
     }
-  }
+
+    public Object apply(ProceedingJoinPoint joinPoint, SagaStart sagaStart, OmegaContext context)
+            throws Throwable {
+        Method method = ((MethodSignature) joinPoint.getSignature()).getMethod();
+        //上报 SagaStartedEvent 事件
+        sagaStartAnnotationProcessor.preIntercept(sagaStart.timeout());
+        LOG.debug("Initialized context {} before execution of method {}", context, method.toString());
+        try {
+            //执行目标方法
+            Object result = joinPoint.proceed();
+            //自动关闭-默认 true
+            if (sagaStart.autoClose()) {
+                // 上报 SagaEndedEvent 事件
+                sagaStartAnnotationProcessor.postIntercept(context.globalTxId());
+                LOG.debug("Transaction with context {} has finished.", context);
+            } else {
+                LOG.debug("Transaction with context {} is not finished in the SagaStarted annotated method.", context);
+            }
+            return result;
+        } catch (Throwable throwable) {
+            // We don't need to handle the OmegaException here
+            if (!(throwable instanceof OmegaException)) {
+                // 上报事务中断事件
+                sagaStartAnnotationProcessor.onError(method.toString(), throwable);
+                LOG.error("Transaction {} failed.", context.globalTxId());
+            }
+            throw throwable;
+        } finally {
+            context.clear();
+        }
+    }
 }

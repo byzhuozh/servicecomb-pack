@@ -20,30 +20,30 @@ package org.apache.servicecomb.pack.omega.transaction;
 import org.apache.servicecomb.pack.omega.context.OmegaContext;
 
 public class CompensableInterceptor implements EventAwareInterceptor {
-  private final OmegaContext context;
-  private final SagaMessageSender sender;
+    private final OmegaContext context;
+    private final SagaMessageSender sender;
 
-  CompensableInterceptor(OmegaContext context, SagaMessageSender sender) {
-    this.sender = sender;
-    this.context = context;
-  }
+    CompensableInterceptor(OmegaContext context, SagaMessageSender sender) {
+        this.sender = sender;
+        this.context = context;
+    }
 
-  @Override
-  public AlphaResponse preIntercept(String parentTxId, String compensationMethod, int timeout, String retriesMethod,
-      int forwardRetries, int forwardTimeout, int reverseRetries, int reverseTimeout, int retryDelayInMilliseconds, Object... message) {
-    return sender.send(new TxStartedEvent(context.globalTxId(), context.localTxId(), parentTxId, compensationMethod,
-        timeout, retriesMethod, forwardRetries, forwardTimeout, reverseRetries, reverseTimeout, retryDelayInMilliseconds, message));
-  }
+    @Override
+    public AlphaResponse preIntercept(String parentTxId, String compensationMethod, int timeout, String retriesMethod,
+                                      int forwardRetries, int forwardTimeout, int reverseRetries, int reverseTimeout, int retryDelayInMilliseconds, Object... message) {
+        return sender.send(new TxStartedEvent(context.globalTxId(), context.localTxId(), parentTxId, compensationMethod,
+                timeout, retriesMethod, forwardRetries, forwardTimeout, reverseRetries, reverseTimeout, retryDelayInMilliseconds, message));
+    }
 
-  @Override
-  public void postIntercept(String parentTxId, String compensationMethod) {
-    sender.send(new TxEndedEvent(context.globalTxId(), context.localTxId(), parentTxId, compensationMethod));
-  }
+    @Override
+    public void postIntercept(String parentTxId, String compensationMethod) {
+        sender.send(new TxEndedEvent(context.globalTxId(), context.localTxId(), parentTxId, compensationMethod));
+    }
 
-  @Override
-  public void onError(String parentTxId, String compensationMethod, Throwable throwable) {
-    sender.send(
-        new TxAbortedEvent(context.globalTxId(), context.localTxId(), parentTxId, compensationMethod, throwable));
-  }
+    @Override
+    public void onError(String parentTxId, String compensationMethod, Throwable throwable) {
+        sender.send(
+                new TxAbortedEvent(context.globalTxId(), context.localTxId(), parentTxId, compensationMethod, throwable));
+    }
 
 }

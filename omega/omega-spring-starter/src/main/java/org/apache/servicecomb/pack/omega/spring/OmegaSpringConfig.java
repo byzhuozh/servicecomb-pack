@@ -18,7 +18,9 @@
 package org.apache.servicecomb.pack.omega.spring;
 
 import com.google.common.collect.ImmutableList;
+
 import java.lang.invoke.MethodHandles;
+
 import org.apache.servicecomb.pack.common.AlphaMetaKeys;
 import org.apache.servicecomb.pack.contract.grpc.ServerMeta;
 import org.apache.servicecomb.pack.omega.connector.grpc.AlphaClusterConfig;
@@ -54,64 +56,65 @@ import org.springframework.context.annotation.Lazy;
 @Configuration
 class OmegaSpringConfig {
 
-  private static final Logger LOG = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
+    private static final Logger LOG = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
-  @ConditionalOnMissingBean
-  @Bean(name = {"omegaUniqueIdGenerator"})
-  IdGenerator<String> idGenerator() {
-    return new UniqueIdGenerator();
-  }
-
-  @Bean
-  OmegaContext omegaContext(@Qualifier("omegaUniqueIdGenerator") IdGenerator<String> idGenerator, @Autowired(required = false) SagaMessageSender messageSender) {
-    if(messageSender!=null){
-      ServerMeta serverMeta = messageSender.onGetServerMeta();
-      boolean akkaEnabeld = false;
-      if(serverMeta!=null){
-        akkaEnabeld = Boolean.parseBoolean(serverMeta.getMetaMap().get(AlphaMetaKeys.AkkaEnabled.name()));
-      }
-      return new OmegaContext(idGenerator, AlphaMetas.builder().akkaEnabled(akkaEnabeld).build());
-    }else{
-      return new OmegaContext(idGenerator, AlphaMetas.builder().build());
+    @ConditionalOnMissingBean
+    @Bean(name = {"omegaUniqueIdGenerator"})
+    IdGenerator<String> idGenerator() {
+        return new UniqueIdGenerator();
     }
-  }
 
-  @Bean
-  ServiceConfig serviceConfig(@Value("${spring.application.name}") String serviceName, @Value("${omega.instance.instanceId:#{null}}") String instanceId) {
-    return new ServiceConfig(serviceName,instanceId);
-  }
+    @Bean
+    OmegaContext omegaContext(@Qualifier("omegaUniqueIdGenerator") IdGenerator<String> idGenerator, @Autowired(required = false) SagaMessageSender messageSender) {
+        if (messageSender != null) {
+            ServerMeta serverMeta = messageSender.onGetServerMeta();
+            boolean akkaEnabeld = false;
+            if (serverMeta != null) {
+                akkaEnabeld = Boolean.parseBoolean(serverMeta.getMetaMap().get(AlphaMetaKeys.AkkaEnabled.name()));
+            }
+            return new OmegaContext(idGenerator, AlphaMetas.builder().akkaEnabled(akkaEnabeld).build());
+        } else {
+            return new OmegaContext(idGenerator, AlphaMetas.builder().build());
+        }
+    }
 
-  @Bean
-  @ConditionalOnProperty(name = "alpha.cluster.register.type", havingValue = "default", matchIfMissing = true)
-  AlphaClusterDiscovery alphaClusterAddress(@Value("${alpha.cluster.address:0.0.0.0:8080}") String[] addresses){
-    return AlphaClusterDiscovery.builder().addresses(addresses).build();
-  }
+    @Bean
+    ServiceConfig serviceConfig(@Value("${spring.application.name}") String serviceName, @Value("${omega.instance.instanceId:#{null}}") String instanceId) {
+        return new ServiceConfig(serviceName, instanceId);
+    }
 
-  @Bean
-  AlphaClusterConfig alphaClusterConfig(
-      @Value("${alpha.cluster.ssl.enable:false}") boolean enableSSL,
-      @Value("${alpha.cluster.ssl.mutualAuth:false}") boolean mutualAuth,
-      @Value("${alpha.cluster.ssl.cert:client.crt}") String cert,
-      @Value("${alpha.cluster.ssl.key:client.pem}") String key,
-      @Value("${alpha.cluster.ssl.certChain:ca.crt}") String certChain,
-      @Lazy AlphaClusterDiscovery alphaClusterDiscovery,
-      @Lazy MessageHandler handler,
-      @Lazy TccMessageHandler tccMessageHandler) {
+    @Bean
+    @ConditionalOnProperty(name = "alpha.cluster.register.type", havingValue = "default", matchIfMissing = true)
+    AlphaClusterDiscovery alphaClusterAddress(@Value("${alpha.cluster.address:0.0.0.0:8080}") String[] addresses) {
+        return AlphaClusterDiscovery.builder().addresses(addresses).build();
+    }
 
-    LOG.info("Discovery alpha cluster address {} from {}",alphaClusterDiscovery.getAddresses() == null ? "" : String.join(",",alphaClusterDiscovery.getAddresses()), alphaClusterDiscovery.getDiscoveryType().name());
-    MessageFormat messageFormat = new KryoMessageFormat();
-    AlphaClusterConfig clusterConfig = AlphaClusterConfig.builder()
-        .addresses(ImmutableList.copyOf(alphaClusterDiscovery.getAddresses()))
-        .enableSSL(enableSSL)
-        .enableMutualAuth(mutualAuth)
-        .cert(cert)
-        .key(key)
-        .certChain(certChain)
-        .messageDeserializer(messageFormat)
-        .messageSerializer(messageFormat)
-        .messageHandler(handler)
-        .tccMessageHandler(tccMessageHandler)
-        .build();
-    return clusterConfig;
-  }
+    @Bean
+    AlphaClusterConfig alphaClusterConfig(
+            @Value("${alpha.cluster.ssl.enable:false}") boolean enableSSL,
+            @Value("${alpha.cluster.ssl.mutualAuth:false}") boolean mutualAuth,
+            @Value("${alpha.cluster.ssl.cert:client.crt}") String cert,
+            @Value("${alpha.cluster.ssl.key:client.pem}") String key,
+            @Value("${alpha.cluster.ssl.certChain:ca.crt}") String certChain,
+            @Lazy AlphaClusterDiscovery alphaClusterDiscovery,
+            @Lazy MessageHandler handler,
+            @Lazy TccMessageHandler tccMessageHandler) {
+
+        LOG.info("Discovery alpha cluster address {} from {}", alphaClusterDiscovery.getAddresses() == null ? "" : String.join(",", alphaClusterDiscovery.getAddresses()), alphaClusterDiscovery.getDiscoveryType()
+                .name());
+        MessageFormat messageFormat = new KryoMessageFormat();
+        AlphaClusterConfig clusterConfig = AlphaClusterConfig.builder()
+                .addresses(ImmutableList.copyOf(alphaClusterDiscovery.getAddresses()))
+                .enableSSL(enableSSL)
+                .enableMutualAuth(mutualAuth)
+                .cert(cert)
+                .key(key)
+                .certChain(certChain)
+                .messageDeserializer(messageFormat)
+                .messageSerializer(messageFormat)
+                .messageHandler(handler)
+                .tccMessageHandler(tccMessageHandler)
+                .build();
+        return clusterConfig;
+    }
 }

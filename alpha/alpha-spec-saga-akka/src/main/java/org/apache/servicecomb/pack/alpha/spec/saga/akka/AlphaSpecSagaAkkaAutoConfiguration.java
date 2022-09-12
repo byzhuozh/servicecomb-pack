@@ -22,9 +22,11 @@ import akka.actor.ActorSystem;
 import akka.actor.Props;
 import com.typesafe.config.Config;
 import com.typesafe.config.ConfigFactory;
+
 import java.lang.invoke.MethodHandles;
 import java.util.Arrays;
 import java.util.Map;
+
 import org.apache.http.HttpHost;
 import org.apache.servicecomb.pack.alpha.core.OmegaCallback;
 import org.apache.servicecomb.pack.alpha.core.fsm.channel.ActorEventChannel;
@@ -70,132 +72,132 @@ import org.springframework.data.elasticsearch.core.ElasticsearchRestTemplate;
 @ConditionalOnExpression("'${alpha.spec.names}'.contains('saga-akka')")
 public class AlphaSpecSagaAkkaAutoConfiguration {
 
-  private static final Logger LOG = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
+    private static final Logger LOG = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
-  public AlphaSpecSagaAkkaAutoConfiguration() {
-    System.setProperty("es.set.netty.runtime.available.processors", "false");
-    LOG.info("Alpha Specification Saga Akka");
-  }
-
-  @Bean
-  public MetricsService metricsService() {
-    return new MetricsService();
-  }
-
-  @Bean
-  public ActorSystem actorSystem(ConfigurableApplicationContext applicationContext,
-      ConfigurableEnvironment environment, MetricsService metricsService,
-      TransactionRepositoryChannel repositoryChannel) {
-    ActorSystem system = ActorSystem
-        .create("alpha-cluster", akkaConfiguration(applicationContext, environment));
-
-    SpringAkkaExtension.SPRING_EXTENSION_PROVIDER.get(system).initialize(applicationContext);
-    SagaDataExtension.SAGA_DATA_EXTENSION_PROVIDER.get(system)
-        .setRepositoryChannel(repositoryChannel);
-    SagaDataExtension.SAGA_DATA_EXTENSION_PROVIDER.get(system).setMetricsService(metricsService);
-    return system;
-  }
-
-  @Bean
-  public Config akkaConfiguration(ConfigurableApplicationContext applicationContext,
-      ConfigurableEnvironment environment) {
-    final Map<String, Object> converted = AkkaConfigPropertyAdapter.getPropertyMap(environment);
-    return ConfigFactory.parseMap(converted)
-        .withFallback(ConfigFactory.defaultReference(applicationContext.getClassLoader()));
-  }
-
-  @Bean(name = "sagaShardRegionActor")
-  public ActorRef sagaShardRegionActor(ActorSystem actorSystem) {
-    return actorSystem.actorOf(Props.create(SagaShardRegionActor.class));
-  }
-
-  @Bean
-  public ElasticsearchRestTemplate elasticsearchRestTemplate(
-      SpecSagaAkkaProperties specSagaAkkaProperties) {
-    HttpHost[] hosts = Arrays.stream(
-            specSagaAkkaProperties.getRepository().getElasticsearch().getUris()
-                .split(","))
-        .map(uri -> HttpHost.create(uri))
-        .toArray(HttpHost[]::new);
-    RestClientBuilder builder = RestClient.builder(hosts);
-    RestHighLevelClient client = new RestHighLevelClient(builder);
-    return new ElasticsearchRestTemplate(client);
-  }
-
-  @Bean
-  public TransactionRepository transactionRepository(
-      SpecSagaAkkaProperties specSagaAkkaProperties,
-      ElasticsearchRestTemplate elasticsearchRestTemplate,
-      MetricsService metricsService) {
-    if (specSagaAkkaProperties.getRepository().getName().equals("elasticsearch")) {
-      return new ElasticsearchTransactionRepository(specSagaAkkaProperties.getRepository()
-          .getElasticsearch(), elasticsearchRestTemplate, metricsService);
-    } else {
-      return new NoneTransactionRepository();
+    public AlphaSpecSagaAkkaAutoConfiguration() {
+        System.setProperty("es.set.netty.runtime.available.processors", "false");
+        LOG.info("Alpha Specification Saga Akka");
     }
-  }
 
-  @Bean
-  TransactionRepositoryChannel memoryTransactionRepositoryChannel(TransactionRepository repository,
-      MetricsService metricsService) {
-    return new DefaultTransactionRepositoryChannel(repository, metricsService);
-  }
-
-  @Bean
-  public ActorEventChannel eventChannel(SpecSagaAkkaProperties specSagaAkkaProperties,
-      MetricsService metricsService) {
-    if (specSagaAkkaProperties.getChannel().getName().equals("kafka")) {
-      return new KafkaActorEventChannel(specSagaAkkaProperties, metricsService);
-    } else {
-      return new MemoryActorEventChannel(metricsService,
-          specSagaAkkaProperties.getChannel().getMemory().getMaxLength());
+    @Bean
+    public MetricsService metricsService() {
+        return new MetricsService();
     }
-  }
 
-  @Bean
-  AbstractEventConsumer eventConsumer(SpecSagaAkkaProperties specSagaAkkaProperties,
-      ActorSystem actorSystem,
-      @Qualifier("sagaShardRegionActor") ActorRef sagaShardRegionActor,
-      MetricsService metricsService,
-      ActorEventChannel actorEventChannel) {
-    if (specSagaAkkaProperties.getChannel().getName().equals("kafka")) {
-      return new KafkaSagaEventConsumer(actorSystem,
-          sagaShardRegionActor, metricsService,
-          specSagaAkkaProperties.getChannel().getKafka().getBootstrapServers(),
-          specSagaAkkaProperties.getChannel().getKafka().getTopic(),
-          specSagaAkkaProperties.getChannel().getKafka().getConsumer());
-    } else {
-      return new MemorySagaEventConsumer(actorSystem, sagaShardRegionActor, metricsService,
-          (MemoryActorEventChannel) actorEventChannel);
+    @Bean
+    public ActorSystem actorSystem(ConfigurableApplicationContext applicationContext,
+                                   ConfigurableEnvironment environment, MetricsService metricsService,
+                                   TransactionRepositoryChannel repositoryChannel) {
+        ActorSystem system = ActorSystem
+                .create("alpha-cluster", akkaConfiguration(applicationContext, environment));
+
+        SpringAkkaExtension.SPRING_EXTENSION_PROVIDER.get(system).initialize(applicationContext);
+        SagaDataExtension.SAGA_DATA_EXTENSION_PROVIDER.get(system)
+                .setRepositoryChannel(repositoryChannel);
+        SagaDataExtension.SAGA_DATA_EXTENSION_PROVIDER.get(system).setMetricsService(metricsService);
+        return system;
     }
-  }
 
-  @Bean
-  GrpcSagaEventService grpcSagaEventService(ActorEventChannel actorEventChannel,
-      Map<String, Map<String, OmegaCallback>> omegaCallbacks) {
-    ServerMeta serverMeta = ServerMeta.newBuilder()
-        .putMeta(AlphaMetaKeys.AkkaEnabled.name(), String.valueOf(true)).build();
-    return new GrpcSagaEventService(actorEventChannel, omegaCallbacks, serverMeta);
-  }
+    @Bean
+    public Config akkaConfiguration(ConfigurableApplicationContext applicationContext,
+                                    ConfigurableEnvironment environment) {
+        final Map<String, Object> converted = AkkaConfigPropertyAdapter.getPropertyMap(environment);
+        return ConfigFactory.parseMap(converted)
+                .withFallback(ConfigFactory.defaultReference(applicationContext.getClassLoader()));
+    }
 
-  @Bean
-  SagaAkkaAPIv1Impl apIv1() {
-    return new SagaAkkaAPIv1Impl();
-  }
+    @Bean(name = "sagaShardRegionActor")
+    public ActorRef sagaShardRegionActor(ActorSystem actorSystem) {
+        return actorSystem.actorOf(Props.create(SagaShardRegionActor.class));
+    }
 
-  @Bean
-  SagaAkkaAPIv1Controller apIv1Controller() {
-    return new SagaAkkaAPIv1Controller();
-  }
+    @Bean
+    public ElasticsearchRestTemplate elasticsearchRestTemplate(
+            SpecSagaAkkaProperties specSagaAkkaProperties) {
+        HttpHost[] hosts = Arrays.stream(
+                        specSagaAkkaProperties.getRepository().getElasticsearch().getUris()
+                                .split(","))
+                .map(uri -> HttpHost.create(uri))
+                .toArray(HttpHost[]::new);
+        RestClientBuilder builder = RestClient.builder(hosts);
+        RestHighLevelClient client = new RestHighLevelClient(builder);
+        return new ElasticsearchRestTemplate(client);
+    }
 
-  @Bean
-  AlphaMetricsEndpoint alphaMetricsEndpoint() {
-    return new AlphaMetricsEndpointImpl();
-  }
+    @Bean
+    public TransactionRepository transactionRepository(
+            SpecSagaAkkaProperties specSagaAkkaProperties,
+            ElasticsearchRestTemplate elasticsearchRestTemplate,
+            MetricsService metricsService) {
+        if (specSagaAkkaProperties.getRepository().getName().equals("elasticsearch")) {
+            return new ElasticsearchTransactionRepository(specSagaAkkaProperties.getRepository()
+                    .getElasticsearch(), elasticsearchRestTemplate, metricsService);
+        } else {
+            return new NoneTransactionRepository();
+        }
+    }
 
-  @Bean
-  @Profile("test")
-  FsmSagaDataController fsmSagaDataController() {
-    return new FsmSagaDataController();
-  }
+    @Bean
+    TransactionRepositoryChannel memoryTransactionRepositoryChannel(TransactionRepository repository,
+                                                                    MetricsService metricsService) {
+        return new DefaultTransactionRepositoryChannel(repository, metricsService);
+    }
+
+    @Bean
+    public ActorEventChannel eventChannel(SpecSagaAkkaProperties specSagaAkkaProperties,
+                                          MetricsService metricsService) {
+        if (specSagaAkkaProperties.getChannel().getName().equals("kafka")) {
+            return new KafkaActorEventChannel(specSagaAkkaProperties, metricsService);
+        } else {
+            return new MemoryActorEventChannel(metricsService,
+                    specSagaAkkaProperties.getChannel().getMemory().getMaxLength());
+        }
+    }
+
+    @Bean
+    AbstractEventConsumer eventConsumer(SpecSagaAkkaProperties specSagaAkkaProperties,
+                                        ActorSystem actorSystem,
+                                        @Qualifier("sagaShardRegionActor") ActorRef sagaShardRegionActor,
+                                        MetricsService metricsService,
+                                        ActorEventChannel actorEventChannel) {
+        if (specSagaAkkaProperties.getChannel().getName().equals("kafka")) {
+            return new KafkaSagaEventConsumer(actorSystem,
+                    sagaShardRegionActor, metricsService,
+                    specSagaAkkaProperties.getChannel().getKafka().getBootstrapServers(),
+                    specSagaAkkaProperties.getChannel().getKafka().getTopic(),
+                    specSagaAkkaProperties.getChannel().getKafka().getConsumer());
+        } else {
+            return new MemorySagaEventConsumer(actorSystem, sagaShardRegionActor, metricsService,
+                    (MemoryActorEventChannel) actorEventChannel);
+        }
+    }
+
+    @Bean
+    GrpcSagaEventService grpcSagaEventService(ActorEventChannel actorEventChannel,
+                                              Map<String, Map<String, OmegaCallback>> omegaCallbacks) {
+        ServerMeta serverMeta = ServerMeta.newBuilder()
+                .putMeta(AlphaMetaKeys.AkkaEnabled.name(), String.valueOf(true)).build();
+        return new GrpcSagaEventService(actorEventChannel, omegaCallbacks, serverMeta);
+    }
+
+    @Bean
+    SagaAkkaAPIv1Impl apIv1() {
+        return new SagaAkkaAPIv1Impl();
+    }
+
+    @Bean
+    SagaAkkaAPIv1Controller apIv1Controller() {
+        return new SagaAkkaAPIv1Controller();
+    }
+
+    @Bean
+    AlphaMetricsEndpoint alphaMetricsEndpoint() {
+        return new AlphaMetricsEndpointImpl();
+    }
+
+    @Bean
+    @Profile("test")
+    FsmSagaDataController fsmSagaDataController() {
+        return new FsmSagaDataController();
+    }
 }
